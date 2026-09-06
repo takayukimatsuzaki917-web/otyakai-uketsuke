@@ -68,7 +68,17 @@
   function toTask(o) {
     var kind = o.op.split(".")[0];
     var verb = o.op.split(".")[1];
-    if (kind === "meta") return function () { return db.doc(DOC_META).set(o.data); };
+    if (kind === "meta") {
+      if (verb === "set") return function () { return db.doc(DOC_META).set(o.data); };
+      /* update は「その書類がすでにある」ことが前提なので、
+         まだ無いときは作りに行く（初回の設定で引っかからないように） */
+      return function () {
+        return db.doc(DOC_META).update(o.data).catch(function (e) {
+          if (e && e.code === "invalid_argument") return db.doc(DOC_META).set(o.data);
+          throw e;
+        });
+      };
+    }
 
     var path = (kind === "member" ? COL_MEMBERS : COL_GROUPS) + "/" + o.id;
     if (verb === "set")    return function () { return db.doc(path).set(o.data); };

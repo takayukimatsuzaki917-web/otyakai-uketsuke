@@ -58,26 +58,35 @@ const click = (el) =>
   el.dispatchEvent(new el.ownerDocument.defaultView.MouseEvent("click", { bubbles: true }));
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-/* 検査用の名簿。実際の参加者ではありません */
+/* 検査用の名簿。実際の参加者ではありません。
+   1日目に2組（うちA組に3名）、2日目に1組（1名）という構成 */
+const DAYS = [{ id: "d1", name: "1日目" }, { id: "d2", name: "2日目" }];
 const GROUPS = [
-  { id: "g_a", name: "A", order: 0 },
-  { id: "g_b", name: "B", order: 1 },
+  { id: "g_a", name: "A", order: 0, day: "d1" },
+  { id: "g_b", name: "B", order: 1, day: "d1" },
+  { id: "g_c", name: "C", order: 0, day: "d2" },
 ];
 const MEMBERS = [
   { id: "m1", gid: "g_a", name: "山田 太郎", order: 0, status: "arrived", arrivedAt: "2026-09-06T09:42:00+09:00", note: "" },
   { id: "m2", gid: "g_a", name: "佐藤 花子", order: 1, status: "waiting", arrivedAt: null, note: "お履物あずかり" },
   { id: "m3", gid: "g_a", name: "鈴木 一郎", order: 2, status: "absent", arrivedAt: null, note: "" },
+  { id: "m9", gid: "g_c", name: "高橋 二郎", order: 0, status: "waiting", arrivedAt: null, note: "" },
 ];
 
 (async () => {
   const { win, doc, commits, h } = boot();
   await tick();
+  h().meta({ title: "秋季茶会", days: DAYS, activeDay: "d1" });
   h().groups(GROUPS);
   h().members(MEMBERS);
 
   /* ---------------- 受付画面 ---------------- */
   console.log("\n■ 受付画面");
-  check("名簿が3行出る", doc.querySelectorAll(".item").length === 3);
+  check("その日の名簿だけ3行出る（2日目の1名は出ない）", doc.querySelectorAll(".item").length === 3);
+  check("見出しに開催日が出る", doc.getElementById("daylabel").textContent === "1日目");
+  check("組タブはその日の2組だけ", doc.querySelectorAll(".tab").length === 2);
+  check("全体の到着数もその日だけ",
+    doc.getElementById("tot-d").textContent === "/3", doc.getElementById("tot-d").textContent);
   check("到着した方に印がつく", doc.querySelectorAll(".item.arrived").length === 1);
   check("欠席の方が区別される", doc.querySelectorAll(".item.absent").length === 1);
   check("到着時刻が出る", /09:42/.test(doc.getElementById("list").innerHTML));
@@ -154,6 +163,62 @@ const MEMBERS = [
   await tick();
   check("文字の大きさを変えられる",
     doc.documentElement.getAttribute("data-size") === "l", sizeBefore + " → l");
+
+  /* ---------------- 開催日の切り替え ---------------- */
+  console.log("\n■ 開催日（1日目 / 2日目）");
+  doc.querySelectorAll(".scrim").forEach((s) => s.remove());
+  check("設定に開催日の選択がある", panel.querySelectorAll("[data-set-day]").length === 2);
+  check("いまの日が選ばれている",
+    panel.querySelector('[data-set-day="d1"]').getAttribute("aria-pressed") === "true");
+  check("日ごとの組数・人数が出る",
+    /2 組 3 名/.test(panel.querySelector('[data-set-day="d1"]').textContent) &&
+    /1 組 1 名/.test(panel.querySelector('[data-set-day="d2"]').textContent));
+
+  click(panel.querySelector('[data-set-day="d2"]'));
+  await tick();
+  const dayScrim = doc.querySelector(".scrim");
+  check("切り替えには確認画面が出る",
+    /2日目.*に切り替えます/.test(dayScrim?.querySelector("h3")?.textContent || ""),
+    dayScrim?.querySelector("h3")?.textContent || "出ない");
+  check("全員の画面が変わる旨を伝える", /全員の画面/.test(dayScrim?.textContent || ""));
+
+  const n0 = commits.length;
+  click(dayScrim.querySelector("[data-yes]"));
+  await tick();
+  const dayOp = commits[commits.length - 1]?.[0];
+  check("切り替えが共有として保存される",
+    commits.length > n0 && dayOp.op === "meta.update" && dayOp.data.activeDay === "d2",
+    dayOp ? dayOp.op + " activeDay=" + dayOp.data.activeDay : "書き込みなし");
+
+  /* 保存先から届いた形で反映されるか（実際の経路と同じ） */
+  h().meta({ title: "秋季茶会", days: DAYS, activeDay: "d2" });
+  await tick();
+  check("2日目の名簿に入れ替わる", doc.querySelectorAll(".item").length === 1);
+  check("見出しが2日目になる", doc.getElementById("daylabel").textContent === "2日目");
+  check("2日目の氏名が出る", /高橋 二郎/.test(doc.getElementById("list").innerHTML));
+
+  /* 組を足すと、いま選んでいる日のものになる */
+  const n1 = commits.length;
+  panel.querySelector("#new-group").value = "D";
+  click(panel.querySelector("#add-group"));
+  await tick();
+  const gOp = commits[commits.length - 1]?.[0];
+  check("追加した組はその日のものになる",
+    commits.length > n1 && gOp.op === "group.set" && gOp.data.day === "d2",
+    gOp ? "day=" + gOp.data.day : "書き込みなし");
+
+  /* リセットはその日だけが対象 */
+  doc.querySelectorAll(".scrim").forEach((s) => s.remove());
+  h().meta({ title: "秋季茶会", days: DAYS, activeDay: "d1" });
+  await tick();
+  click(panel.querySelector("#reset-records"));
+  await tick();
+  const rs = doc.querySelector(".scrim");
+  check("リセットはその日だけが対象と分かる",
+    /ほかの日の記録はそのまま/.test(rs?.textContent || ""),
+    (rs?.querySelector("h3")?.textContent || "").trim());
+  click(rs.querySelector("[data-no]"));
+  await tick();
 
   console.log("\n" + (ng === 0 ? "すべて通りました。" : ng + " 件が通りませんでした。"));
   process.exit(ng === 0 ? 0 : 1);

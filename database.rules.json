@@ -10,6 +10,13 @@
 
         "meta": {
           "title":     { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "activeDay": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "days": {
+            "$i": {
+              "id":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+              "name": { ".validate": "newData.isString() && newData.val().length <= 30" }
+            }
+          },
           "updatedAt": { ".validate": "newData.isString()" }
         },
 
@@ -18,6 +25,7 @@
             ".validate": "newData.hasChild('name')",
             "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
             "order":     { ".validate": "newData.isNumber()" },
+            "day":       { ".validate": "newData.isString() && newData.val().length <= 64" },
             "createdAt": { ".validate": "newData.isString()" }
           }
         },

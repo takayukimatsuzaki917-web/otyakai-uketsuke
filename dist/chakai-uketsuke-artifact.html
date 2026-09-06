@@ -140,9 +140,19 @@ button{touch-action:manipulation}
   font-weight:600;font-size:1.06rem;letter-spacing:.06em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+/* いま受け付けている日。飾りではなく状態を示す札なので、
+   小さくても読み取れるよう色と地をつけて独立させる。
+   1日だけの会では要素ごと隠す（app.js の renderHead） */
 .brand .sub{
-  font-size:.7rem;letter-spacing:.14em;color:var(--ink-3);
-  text-transform:uppercase;
+  align-self:flex-start;
+  margin-top:2px;
+  padding:1px 8px;
+  border-radius:999px;
+  background:var(--accent-soft);
+  color:var(--accent-text);
+  border:1px solid var(--accent);
+  font-size:.74rem;font-weight:700;letter-spacing:.04em;
+  white-space:nowrap;
 }
 .total{
   display:flex;align-items:baseline;gap:2px;
@@ -635,7 +645,17 @@ label.fld > span{
   function toTask(o) {
     var kind = o.op.split(".")[0];
     var verb = o.op.split(".")[1];
-    if (kind === "meta") return function () { return db.doc(DOC_META).set(o.data); };
+    if (kind === "meta") {
+      if (verb === "set") return function () { return db.doc(DOC_META).set(o.data); };
+      /* update は「その書類がすでにある」ことが前提なので、
+         まだ無いときは作りに行く（初回の設定で引っかからないように） */
+      return function () {
+        return db.doc(DOC_META).update(o.data).catch(function (e) {
+          if (e && e.code === "invalid_argument") return db.doc(DOC_META).set(o.data);
+          throw e;
+        });
+      };
+    }
 
     var path = (kind === "member" ? COL_MEMBERS : COL_GROUPS) + "/" + o.id;
     if (verb === "set")    return function () { return db.doc(path).set(o.data); };
@@ -718,7 +738,8 @@ label.fld > span{
      {op:"group.set",     id, data}
      {op:"group.update",  id, data}
      {op:"group.delete",  id}
-     {op:"meta.set",      data}
+     {op:"meta.set",      data}   会の情報を丸ごと置き換え
+     {op:"meta.update",   data}   会の情報のうち渡した項目だけ更新
    ============================================================= */
 (function () {
   "use strict";
@@ -732,6 +753,8 @@ label.fld > span{
   var STATUS_LABEL = { waiting: "未到着", arrived: "到着", absent: "欠席" };
 
   var DEFAULT_TITLE = "茶会受付帳";
+  /* 開催日。日をひとつも決めていない受付帳は、1日だけの会として扱う */
+  var DEFAULT_DAY = { id: "d1", name: "1日目" };
   var TOAST_MS = 8000;          // トーストと「取消」を出しておく時間。押し間違いに気づく余裕をとる
   var SIZE_KEY = "chakai-uketsuke:size";   // 文字の大きさ（この端末だけの設定）
   var SIZES = ["m", "l", "xl"];
@@ -745,8 +768,10 @@ label.fld > span{
   var connected = false;    // 保存先とつながっているか
   var connError = null;     // つながらない理由（コード）
   var connHelp = null;      // つながらないときに出す案内HTML（アダプタが用意）
-  var meta = { title: DEFAULT_TITLE };
-  var groups = [];          // {id, name, order}
+  /* meta は全端末で共有する。activeDay を共有にしているのは、受付担当が
+     それぞれ違う日を見ながら記録してしまう事故を防ぐため */
+  var meta = { title: DEFAULT_TITLE, days: [DEFAULT_DAY], activeDay: DEFAULT_DAY.id };
+  var groups = [];          // {id, name, order, day}
   var members = [];         // {id, gid, name, order, status, arrivedAt, note}
   var activeGid = null;     // 表示中の組
   var onlyWaiting = false;  // 「未着のみ」の絞り込み
@@ -796,6 +821,50 @@ label.fld > span{
 
   /** 検索用の正規化。姓名の間の空白や大文字小文字の違いを無視する */
   function norm(s) { return String(s || "").replace(/[\s　]/g, "").toLowerCase(); }
+
+  /* ---------------------------------------------------------
+     開催日
+     -------------------------------------------------------------
+     日は「組」に持たせています。参加者は組に属するので、日は自動的に
+     決まります。同じ方が両日いらっしゃる場合は、日ごとに別の名簿へ
+     載せる形になり、到着の記録も日ごとに分かれます。
+     --------------------------------------------------------- */
+
+  /** 開催日の一覧。決めていなければ1日だけの会として扱う */
+  function dayList() {
+    return (meta.days && meta.days.length) ? meta.days : [DEFAULT_DAY];
+  }
+
+  /** いま受け付けている日 */
+  function activeDay() {
+    var ds = dayList();
+    for (var i = 0; i < ds.length; i++) if (ds[i].id === meta.activeDay) return ds[i];
+    return ds[0];
+  }
+
+  /** ある日に属する組。day を持たない古い組は1日目のものとして扱う */
+  function groupsOfDay(dayId) {
+    return groups.filter(function (g) { return g.day === dayId; });
+  }
+
+  /** ある日に属する参加者 */
+  function membersOfDay(dayId) {
+    var ids = {};
+    groupsOfDay(dayId).forEach(function (g) { ids[g.id] = true; });
+    return members.filter(function (m) { return ids[m.gid]; });
+  }
+
+  /** いま受け付けている日の組・参加者 */
+  function dayGroups() { return groupsOfDay(activeDay().id); }
+  function dayMembers() { return membersOfDay(activeDay().id); }
+
+  /** 表示中の組が、いまの日に無くなっていたら選び直す */
+  function ensureActiveGid() {
+    var gs = dayGroups();
+    if (!activeGid || !gs.some(function (g) { return g.id === activeGid; })) {
+      activeGid = gs.length ? gs[0].id : null;
+    }
+  }
 
   /* ---------------------------------------------------------
      文字の大きさ（標準 / 大きく / もっと大きく）
@@ -864,8 +933,8 @@ label.fld > span{
       if (!v.groups.length) return false;
       groups = v.groups.map(mapGroup).sort(byOrder);
       members = v.members.map(mapMember).sort(byOrder);
-      activeGid = groups.length ? groups[0].id : null;
-      if (v.title) meta.title = String(v.title);
+      if (v.meta) meta = mapMeta(v.meta);
+      ensureActiveGid();
       fromCache = true;
       return true;
     } catch (e) { return false; }   // 使えない環境なら黙って諦める
@@ -876,7 +945,7 @@ label.fld > span{
     cacheTimer = setTimeout(function () {
       try {
         window.localStorage.setItem(cacheKey(), JSON.stringify({
-          groups: groups, members: members, title: meta.title, savedAt: nowIso()
+          groups: groups, members: members, meta: meta, savedAt: nowIso()
         }));
       } catch (e) { /* 容量超過や無効化。控えが無くても動作に支障はない */ }
     }, 500);
@@ -894,7 +963,7 @@ label.fld > span{
         '<div class="stickyhead">' +
         '<header class="topbar"><div class="topbar-inner">' +
           '<div class="brand"><h1 id="ttl">' + esc(DEFAULT_TITLE) + "</h1>" +
-            '<span class="sub">RECEPTION</span></div>' +
+            '<span class="sub" id="daylabel" hidden></span></div>' +
           '<div class="total"><span class="n" id="tot-n">–</span><span class="d" id="tot-d"></span></div>' +
           '<button class="icon-btn" id="btn-settings" aria-label="設定を開く">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle>' +
@@ -935,7 +1004,29 @@ label.fld > span{
      保存先との接続
      ========================================================= */
   function mapGroup(v) {
-    return { id: String(v.id), name: String(v.name || ""), order: Number(v.order) || 0 };
+    return {
+      id: String(v.id),
+      name: String(v.name || ""),
+      order: Number(v.order) || 0,
+      /* day を持たない組は、複数日に分ける前に作られたもの。1日目として扱う */
+      day: String(v.day || DEFAULT_DAY.id)
+    };
+  }
+
+  /** 保存されている meta を、扱いやすい形に整える */
+  function mapMeta(v) {
+    v = v || {};
+    var raw = v.days;
+    if (raw && !Array.isArray(raw)) raw = Object.keys(raw).map(function (k) { return raw[k]; });
+    var days = (raw || [])
+      .filter(function (d) { return d && d.id; })
+      .map(function (d) { return { id: String(d.id), name: String(d.name || "") }; });
+    if (!days.length) days = [DEFAULT_DAY];
+    return {
+      title: v.title ? String(v.title) : DEFAULT_TITLE,
+      days: days,
+      activeDay: v.activeDay ? String(v.activeDay) : days[0].id
+    };
   }
 
   function mapMember(v) {
@@ -963,18 +1054,17 @@ label.fld > span{
     try {
       res = await Store.connect({
         meta: function (v) {
-          meta.title = (v && v.title) ? String(v.title) : DEFAULT_TITLE;
-          var el = $("ttl");
-          if (el) el.textContent = meta.title;
-          document.title = meta.title;
+          meta = mapMeta(v);
+          ensureActiveGid();
+          if (!isLoading()) saveCache();
+          renderAll();
+          if (settingsOpen) renderSettings();
         },
         groups: function (list) {
           groups = list.map(mapGroup).sort(byOrder);
           firstSnap.groups = true;
           lastSyncAt = nowIso();
-          if (!activeGid || !groups.some(function (g) { return g.id === activeGid; })) {
-            activeGid = groups.length ? groups[0].id : null;
-          }
+          ensureActiveGid();
           if (!isLoading()) { fromCache = false; saveCache(); }
           renderAll();
           if (settingsOpen) renderSettings();
@@ -1075,11 +1165,29 @@ label.fld > span{
      描画
      ========================================================= */
   function renderAll() {
+    renderHead();
     renderConn();
     renderTotal();
     renderTabs();
     renderBar();
     renderList();
+  }
+
+  /** 案内文に添える日の名前。1日だけの会では空にして、よけいな言葉を出さない */
+  function dayName() {
+    return dayList().length > 1 ? activeDay().name : "";
+  }
+
+  /** 会の名称と、いま受け付けている日 */
+  function renderHead() {
+    var t = $("ttl"), d = $("daylabel");
+    if (t) t.textContent = meta.title;
+    document.title = meta.title;
+    if (!d) return;
+    /* 1日だけの会では出さない。2日以上あるときだけ、どの日かを常に見せる */
+    var multi = dayList().length > 1;
+    d.hidden = !multi;
+    d.textContent = multi ? activeDay().name : "";
   }
 
   /**
@@ -1093,11 +1201,11 @@ label.fld > span{
 
     var parts = [];
     if (query) {
-      var hit = members.filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; });
-      parts.push("「" + esc(query) + "」に一致 <b>" + hit.length + "</b> 件（全組から）");
+      var found = dayMembers().filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; });
+      parts.push("「" + esc(query) + "」に一致 <b>" + found.length + "</b> 件（全組から）");
     } else if (isLoading()) {
       parts.push("読み込んでいます…");
-    } else if (!members.length) {
+    } else if (!dayMembers().length) {
       parts.push("名簿がまだありません");
     } else {
       var t = tally(membersOf(activeGid));
@@ -1157,16 +1265,18 @@ label.fld > span{
   }
 
   function renderTotal() {
-    var t = tally(members);
-    $("tot-n").textContent = members.length ? t.arrived : "–";
-    $("tot-d").textContent = members.length ? "/" + t.total : "";
+    var mem = dayMembers();
+    var t = tally(mem);
+    $("tot-n").textContent = mem.length ? t.arrived : "–";
+    $("tot-d").textContent = mem.length ? "/" + t.total : "";
   }
 
   function renderTabs() {
     var wrap = $("tabs-wrap"), box = $("tabs");
-    if (!groups.length) { wrap.hidden = true; return; }
+    var gs = dayGroups();
+    if (!gs.length) { wrap.hidden = true; return; }
     wrap.hidden = false;
-    box.innerHTML = groups.map(function (g) {
+    box.innerHTML = gs.map(function (g) {
       var t = tally(membersOf(g.id));
       var done = t.total > 0 && t.arrived + t.absent === t.total;
       return '<button class="tab' + (done ? " done" : "") + '" role="tab" data-gid="' + esc(g.id) + '"' +
@@ -1181,7 +1291,7 @@ label.fld > span{
     var toolbar = $("toolbar");
 
     /* --- 名簿がまだ無い／つながっていない場合の案内 --- */
-    if (!groups.length || !members.length) {
+    if (!dayGroups().length || !dayMembers().length) {
       toolbar.hidden = true; list.innerHTML = "";
       empty.hidden = false;
       if (!connected && connError) {
@@ -1192,11 +1302,13 @@ label.fld > span{
            ここを飛ばすと、再読み込みのたびに初期設定の案内が明滅する */
         empty.innerHTML = "<h2>名簿を読み込んでいます</h2>" +
           "<p>保存先から最新の内容を受け取っています。しばらくお待ちください。</p>";
-      } else if (!groups.length) {
-        empty.innerHTML = "<h2>まず組をつくります</h2><p>設定画面で組（A・B・C…）を追加し、それぞれの名簿を貼り付けてください。当日は設定を開く必要はありません。</p>" +
+      } else if (!dayGroups().length) {
+        empty.innerHTML = "<h2>" + esc(dayName()) + "の組をつくります</h2>" +
+          "<p>設定画面で組（A・B・C…）を追加し、それぞれの名簿を貼り付けてください。当日は設定を開く必要はありません。</p>" +
           '<button class="btn primary" data-open-settings>設定をひらく</button>';
       } else {
-        empty.innerHTML = "<h2>名簿がまだ空です</h2><p>設定画面で、組ごとに氏名を改行区切りで貼り付けると一括で登録できます。</p>" +
+        empty.innerHTML = "<h2>" + esc(dayName()) + "の名簿がまだ空です</h2>" +
+          "<p>設定画面で、組ごとに氏名を改行区切りで貼り付けると一括で登録できます。</p>" +
           '<button class="btn primary" data-open-settings>名簿を登録する</button>';
       }
       return;
@@ -1208,7 +1320,7 @@ label.fld > span{
     /* --- 表示対象：検索中は全組から、通常は選択中の組から --- */
     var searching = query.length > 0;
     var src = searching
-      ? members.filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; })
+      ? dayMembers().filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; })
       : membersOf(activeGid);
 
     var shown = onlyWaiting ? src.filter(function (m) { return m.status === WAITING; }) : src;
@@ -1422,14 +1534,20 @@ label.fld > span{
     var keptMode = panel.querySelector('input[name="bulk-mode"]:checked');
     keptMode = keptMode ? keptMode.value : "append";
 
-    var gopts = groups.map(function (g) {
+    var gs = dayGroups();
+    var gopts = gs.map(function (g) {
       return '<option value="' + esc(g.id) + '"' + (g.id === settingsGid ? " selected" : "") + ">" +
         esc(g.name) + " 組（" + membersOf(g.id).length + " 名）</option>";
     }).join("");
 
-    var whole = tally(members);
-    var marked = members.filter(function (m) { return m.status !== WAITING || m.note; }).length;
+    var dayMem = dayMembers();
+    var whole = tally(dayMem);
+    var marked = dayMem.filter(function (m) { return m.status !== WAITING || m.note; }).length;
     var size = currentSize();
+    var days = dayList();
+    var ad = activeDay();
+    var multi = days.length > 1;
+    var dayTag = multi ? "「" + ad.name + "」の" : "";
 
     var inputStyle = 'style="flex:1;min-width:0;padding:12px;background:var(--paper);' +
       'border:1px solid var(--line-strong);border-radius:10px;font-size:1rem"';
@@ -1442,9 +1560,35 @@ label.fld > span{
       "</div></div>" +
       '<div class="panel-body">' +
 
+        /* --- 開催日 ---
+           いちばん上に置く。以下の「組」「名簿」「リセット」はすべて
+           ここで選んだ日に対しての操作になるため */
+        '<div class="card">' +
+          "<h3>開催日</h3>" +
+          '<p class="lead">組と名簿は日ごとに別々に持ちます。切り替えると、' +
+            "<b>この受付帳を開いている全員の画面が切り替わります</b>。" +
+            "以下の設定は、いま選んでいる日に対しての操作になります。</p>" +
+          '<div class="seg" style="grid-template-columns:repeat(auto-fit,minmax(104px,1fr))" role="group" aria-label="開催日">' +
+            days.map(function (d) {
+              return '<button type="button" data-set-day="' + esc(d.id) + '"' +
+                ' aria-pressed="' + (d.id === ad.id) + '">' + esc(d.name) +
+                "<small>" + groupsOfDay(d.id).length + " 組 " + membersOfDay(d.id).length + " 名</small></button>";
+            }).join("") +
+          "</div>" +
+          '<div class="row-add">' +
+            '<input id="new-day" type="text" placeholder="日の名前（例：2日目）" ' + inputStyle + ">" +
+            '<button class="btn" id="add-day">追加</button>' +
+          "</div>" +
+          '<div style="display:flex;gap:8px;margin-top:10px">' +
+            '<button class="btn ghost" id="ren-day" style="flex:1">名称を変える</button>' +
+            '<button class="btn danger" id="del-day" style="flex:1">この日を削除</button>' +
+          "</div>" +
+          '<div class="status" id="day-status">いま受け付けている日：<b>' + esc(ad.name) + "</b></div>" +
+        "</div>" +
+
         /* --- 名簿の一括登録 --- */
         '<div class="card">' +
-          "<h3>名簿の一括登録</h3>" +
+          "<h3>" + esc(dayTag) + "名簿の一括登録</h3>" +
           '<p class="lead">氏名を <b>改行区切り</b> で貼り付けます。空行は無視されます。一度登録すれば、当日はこの画面を開く必要はありません。</p>' +
           '<label class="fld"><span>登録する組</span><select id="bulk-gid">' +
             (gopts || "<option>組がありません</option>") + "</select></label>" +
@@ -1466,9 +1610,10 @@ label.fld > span{
 
         /* --- 組の管理 --- */
         '<div class="card">' +
-          "<h3>組の管理</h3>" +
-          '<p class="lead">組はいくつでも追加できます。名前は「A」「立礼席」など自由につけられます。</p>' +
-          '<ul class="glist">' + (groups.length ? groups.map(function (g) {
+          "<h3>" + esc(dayTag) + "組の管理</h3>" +
+          '<p class="lead">組はいくつでも追加できます。名前は「A」「立礼席」など自由につけられます。' +
+            (multi ? "ここで追加した組は「" + esc(ad.name) + "」のものになります。" : "") + "</p>" +
+          '<ul class="glist">' + (gs.length ? gs.map(function (g) {
             var t = tally(membersOf(g.id));
             return "<li>" +
               '<span class="gn">' + esc(g.name) + "</span>" +
@@ -1476,7 +1621,7 @@ label.fld > span{
               '<button data-ren="' + esc(g.id) + '">名称</button>' +
               '<button data-delg="' + esc(g.id) + '">削除</button>' +
             "</li>";
-          }).join("") : '<li><span class="gn" style="font-weight:400;color:var(--ink-3)">まだ組がありません</span></li>') + "</ul>" +
+          }).join("") : '<li><span class="gn" style="font-weight:400;color:var(--ink-3)">この日にはまだ組がありません</span></li>') + "</ul>" +
           '<div class="row-add">' +
             '<input id="new-group" type="text" placeholder="組の名前（例：H）" ' + inputStyle + ">" +
             '<button class="btn" id="add-group">追加</button>' +
@@ -1508,11 +1653,13 @@ label.fld > span{
 
         /* --- リセット --- */
         '<div class="card danger-zone">' +
-          "<h3>リセット</h3>" +
-          '<p class="lead">どちらも取り消せません。押すと必ず確認画面が出て、何がいくつ消えるかを確かめてから実行します。</p>' +
+          "<h3>" + esc(dayTag) + "リセット</h3>" +
+          '<p class="lead">' + (multi ? "「" + esc(ad.name) + "」だけが対象で、ほかの日は残ります。" : "") +
+            "どちらも取り消せません。押すと必ず確認画面が出て、何がいくつ消えるかを確かめてから実行します。</p>" +
           '<button class="btn danger wide" id="reset-records">受付の記録だけ消す（名簿は残る）</button>' +
           '<button class="btn danger wide" id="reset-all">すべて消して最初から（名簿・組も消す）</button>' +
-          '<div class="status" id="reset-status">現在：名簿 ' + whole.total + " 名／組 " + groups.length +
+          '<div class="status" id="reset-status">' + (multi ? esc(ad.name) + "の" : "") +
+            "現在：名簿 " + whole.total + " 名／組 " + gs.length +
             "／記録のある方 " + marked + " 名</div>" +
         "</div>" +
 
@@ -1526,6 +1673,13 @@ label.fld > span{
 
     panel.addEventListener("click", async function (e) {
       if (hit(e, "[data-close-settings]", panel)) { closeSettings(); return; }
+      if (hit(e, "#add-day", panel)) { await doAddDay(panel); return; }
+      if (hit(e, "#ren-day", panel)) { openRenameDay(); return; }
+      if (hit(e, "#del-day", panel)) { await doDeleteDay(panel); return; }
+
+      var sd = hit(e, "[data-set-day]", panel);
+      if (sd) { await doSwitchDay(panel, sd.getAttribute("data-set-day")); return; }
+
       if (hit(e, "#bulk-run", panel))      { await doBulkRegister(panel); return; }
       if (hit(e, "#add-group", panel))     { await doAddGroup(panel); return; }
       if (hit(e, "#save-title", panel))    { await doSaveTitle(panel); return; }
@@ -1549,6 +1703,134 @@ label.fld > span{
       var dg = hit(e, "[data-delg]", panel);
       if (dg) { await doDeleteGroup(panel, dg.getAttribute("data-delg")); return; }
     });
+  }
+
+  /** meta を書き換える。共有なので、全端末に同じ内容が届く */
+  function saveMeta(patch) {
+    return Store.commit([{ op: "meta.update",
+      data: Object.assign({ updatedAt: nowIso() }, patch) }]);
+  }
+
+  /**
+   * 受け付ける日を切り替える。
+   * 全端末が一斉に切り替わるため、必ず確認を挟む。
+   */
+  async function doSwitchDay(panel, dayId) {
+    var st = panel.querySelector("#day-status");
+    var d = dayList().filter(function (x) { return x.id === dayId; })[0];
+    if (!d || d.id === activeDay().id) return;
+    if (!connected) { st.className = "status err"; st.textContent = "保存先に接続できていません。"; return; }
+
+    var ok = await confirmDialog({
+      title: "「" + d.name + "」に切り替えます",
+      body: "この受付帳を開いている全員の画面が「" + d.name + "」に切り替わります。" +
+        "受付の途中でないことを確かめてください。",
+      what: [
+        { k: "切り替え先", v: d.name },
+        { k: "その日の組", v: groupsOfDay(d.id).length + " 組" },
+        { k: "その日の名簿", v: membersOfDay(d.id).length + " 名" }
+      ],
+      ok: "切り替える"
+    });
+    if (!ok) return;
+
+    try {
+      await saveMeta({ activeDay: d.id });
+      st.className = "status";
+      st.textContent = "「" + d.name + "」に切り替えました。";
+      showToast("「" + d.name + "」の受付に切り替えました");
+    } catch (err) {
+      st.className = "status err"; st.textContent = "切り替えられませんでした（" + errText(err) + "）。";
+    }
+  }
+
+  /** 開催日を追加する */
+  async function doAddDay(panel) {
+    var st = panel.querySelector("#day-status");
+    var input = panel.querySelector("#new-day");
+    var name = input.value.trim();
+    if (!connected) { st.className = "status err"; st.textContent = "保存先に接続できていません。"; return; }
+    if (!name) { st.className = "status err"; st.textContent = "日の名前を入力してください（例：2日目）。"; return; }
+    var days = dayList();
+    if (days.some(function (d) { return d.name === name; })) {
+      st.className = "status err"; st.textContent = "同じ名前の日があります。"; return;
+    }
+    var next = days.concat([{ id: uid("d_"), name: name }]);
+    try {
+      await saveMeta({ days: next });
+      input.value = "";
+      st.className = "status";
+      st.textContent = name + " を追加しました。組と名簿を入れるには、上で「" + name + "」に切り替えてください。";
+    } catch (err) {
+      st.className = "status err"; st.textContent = "追加できませんでした（" + errText(err) + "）。";
+    }
+  }
+
+  /** 開催日の名称を変える */
+  function openRenameDay() {
+    var d = activeDay();
+    var scrim = document.createElement("div");
+    scrim.className = "scrim";
+    scrim.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' +
+      '<div class="grabber" aria-hidden="true"></div>' +
+      "<h2>日の名称</h2>" +
+      '<label class="fld"><span>名称</span><input id="rnd" type="text" value="' + esc(d.name) + '"></label>' +
+      '<div class="sheet-actions"><button class="btn ghost" data-close>やめる</button>' +
+      '<button class="btn primary" data-ok>保存</button></div></div>';
+    scrim.addEventListener("click", async function (e) {
+      if (e.target === scrim || e.target.closest("[data-close]")) { scrim.remove(); return; }
+      if (e.target.closest("[data-ok]")) {
+        var v = scrim.querySelector("#rnd").value.trim();
+        if (!v) return;
+        scrim.remove();
+        var next = dayList().map(function (x) {
+          return x.id === d.id ? { id: x.id, name: v } : x;
+        });
+        try { await saveMeta({ days: next }); }
+        catch (err) { showToast("名称を保存できませんでした（" + errText(err) + "）"); }
+      }
+    });
+    document.body.appendChild(scrim);
+  }
+
+  /** 開催日を、その日の組と名簿ごと削除する */
+  async function doDeleteDay(panel) {
+    var st = panel.querySelector("#day-status");
+    var d = activeDay();
+    var days = dayList();
+    if (days.length <= 1) {
+      st.className = "status err";
+      st.textContent = "日は少なくとも1つ必要です。先に別の日を追加してください。";
+      return;
+    }
+    var gs = groupsOfDay(d.id);
+    var mem = membersOfDay(d.id);
+    var t = tally(mem);
+    var ok = await confirmDialog({
+      title: "「" + d.name + "」を削除します",
+      body: "この日と、この日の組・名簿・受付の記録をまとめて消します。ほかの日は残ります。",
+      what: [
+        { k: "消える組", v: gs.length + " 組" },
+        { k: "消える名簿", v: mem.length + " 名" },
+        { k: "うち到着済み", v: t.arrived + " 名" }
+      ],
+      warn: "この操作は取り消せません。",
+      ok: "削除する", tone: "danger"
+    });
+    if (!ok) return;
+
+    var rest = days.filter(function (x) { return x.id !== d.id; });
+    var ops = mem.map(function (m) { return { op: "member.delete", id: m.id }; })
+      .concat(gs.map(function (g) { return { op: "group.delete", id: g.id }; }));
+    st.className = "status"; st.textContent = "削除しています…";
+    try {
+      if (ops.length) await Store.commit(ops, function (n, all) { st.textContent = "削除しています… " + n + " / " + all; });
+      await saveMeta({ days: rest, activeDay: rest[0].id });
+      st.textContent = "「" + d.name + "」を削除しました。";
+    } catch (err) {
+      st.className = "status err";
+      st.textContent = "削除しきれませんでした（" + errText(err) + "）。もう一度お試しください。";
+    }
   }
 
   /** 名簿の一括登録（追記／入れ替え） */
@@ -1649,13 +1931,14 @@ label.fld > span{
     var name = input.value.trim();
     if (!connected) { gs.className = "status err"; gs.textContent = "保存先に接続できていません。"; return; }
     if (!name) { gs.className = "status err"; gs.textContent = "組の名前を入力してください。"; return; }
-    if (groups.some(function (g) { return g.name === name; })) {
-      gs.className = "status err"; gs.textContent = "同じ名前の組があります。"; return;
+    var mine = dayGroups();
+    if (mine.some(function (g) { return g.name === name; })) {
+      gs.className = "status err"; gs.textContent = "この日には同じ名前の組があります。"; return;
     }
-    var order = groups.reduce(function (mx, g) { return Math.max(mx, g.order); }, -1) + 1;
+    var order = mine.reduce(function (mx, g) { return Math.max(mx, g.order); }, -1) + 1;
     try {
       await Store.commit([{ op: "group.set", id: uid("g_"),
-        data: { name: name, order: order, createdAt: nowIso() } }]);
+        data: { name: name, order: order, day: activeDay().id, createdAt: nowIso() } }]);
       input.value = "";
       gs.className = "status"; gs.textContent = name + " 組を追加しました。";
     } catch (err) {
@@ -1698,10 +1981,9 @@ label.fld > span{
   async function doSaveTitle(panel) {
     var v = panel.querySelector("#meta-title").value.trim() || DEFAULT_TITLE;
     try {
-      await Store.commit([{ op: "meta.set", data: { title: v, updatedAt: nowIso() } }]);
+      await saveMeta({ title: v });
       meta.title = v;
-      $("ttl").textContent = v;
-      document.title = v;
+      renderHead();
       showToast("会の名称を保存しました");
     } catch (err) { showToast("保存できませんでした（" + errText(err) + "）"); }
   }
@@ -1709,20 +1991,22 @@ label.fld > span{
   /** リセット其の一：受付の記録だけ消す（名簿は残す） */
   async function doResetRecords(panel) {
     var rs = panel.querySelector("#reset-status");
-    var marked = members.filter(function (m) { return m.status !== WAITING || m.note; });
+    var mem = dayMembers();
+    var marked = mem.filter(function (m) { return m.status !== WAITING || m.note; });
     if (!marked.length) {
       rs.className = "status"; rs.textContent = "消す記録がありません。すでにすべて未到着です。"; return;
     }
     var t = tally(marked);
     var noted = marked.filter(function (m) { return !!m.note; }).length;
     var ok = await confirmDialog({
-      title: "受付の記録を消します",
-      body: "名簿と組はそのまま残り、到着・欠席・備考だけが消えて全員「未到着」に戻ります。",
+      title: dayName() ? dayName() + "の受付の記録を消します" : "受付の記録を消します",
+      body: "名簿と組はそのまま残り、到着・欠席・備考だけが消えて全員「未到着」に戻ります。" +
+        (dayName() ? "ほかの日の記録はそのままです。" : ""),
       what: [
         { k: "到着を取り消す", v: t.arrived + " 名" },
         { k: "欠席を取り消す", v: t.absent + " 名" },
         { k: "備考を消す", v: noted + " 名" },
-        { k: "残る名簿", v: members.length + " 名" }
+        { k: "残る名簿", v: mem.length + " 名" }
       ],
       warn: "この操作は取り消せません。",
       ok: "記録を消す", tone: "danger"
@@ -1736,7 +2020,7 @@ label.fld > span{
     });
     try {
       await Store.commit(ops, function (d, n) { rs.textContent = "消しています… " + d + " / " + n; });
-      rs.textContent = "受付の記録を消しました。名簿 " + members.length + " 名はそのまま残っています。";
+      rs.textContent = "受付の記録を消しました。名簿 " + mem.length + " 名はそのまま残っています。";
     } catch (err) {
       rs.className = "status err";
       rs.textContent = "一部が消せませんでした（" + errText(err) + "）。もう一度お試しください。";
@@ -1746,16 +2030,18 @@ label.fld > span{
   /** リセット其の二：名簿・組も含めてすべて消す */
   async function doResetAll(panel) {
     var rs = panel.querySelector("#reset-status");
-    if (!members.length && !groups.length) {
+    var gs = dayGroups(), mem = dayMembers();
+    if (!mem.length && !gs.length) {
       rs.className = "status"; rs.textContent = "消すものがありません。"; return;
     }
-    var t = tally(members);
+    var t = tally(mem);
     var ok = await confirmDialog({
-      title: "すべて消して最初からやり直します",
-      body: "名簿・組・受付の記録を、この受付帳からすべて消します。空の状態に戻ります。",
+      title: dayName() ? dayName() + "をすべて消して最初からやり直します" : "すべて消して最初からやり直します",
+      body: "名簿・組・受付の記録をすべて消し、空の状態に戻します。" +
+        (dayName() ? "ほかの日はそのまま残ります。" : ""),
       what: [
-        { k: "消える組", v: groups.length + " 組" },
-        { k: "消える名簿", v: members.length + " 名" },
+        { k: "消える組", v: gs.length + " 組" },
+        { k: "消える名簿", v: mem.length + " 名" },
         { k: "うち到着済み", v: t.arrived + " 名" }
       ],
       warn: "この操作は取り消せません。名簿の貼り直しが必要になります。",
@@ -1766,14 +2052,15 @@ label.fld > span{
     /* 取り返しがつかないので、二度目の確認を挟む */
     var sure = await confirmDialog({
       title: "本当によろしいですか",
-      body: "もう一度おたずねします。" + groups.length + " 組・" + members.length +
+      body: "もう一度おたずねします。" + (dayName() ? dayName() + "の" : "") +
+        gs.length + " 組・" + mem.length +
         " 名の名簿がすべて消えます。受付の途中でないことを確かめてください。",
       ok: "はい、すべて消します", tone: "danger"
     });
     if (!sure) { rs.className = "status"; rs.textContent = "取りやめました。何も消していません。"; return; }
 
-    var ops = members.map(function (m) { return { op: "member.delete", id: m.id }; })
-      .concat(groups.map(function (g) { return { op: "group.delete", id: g.id }; }));
+    var ops = mem.map(function (m) { return { op: "member.delete", id: m.id }; })
+      .concat(gs.map(function (g) { return { op: "group.delete", id: g.id }; }));
     rs.className = "status"; rs.textContent = "消しています… 0 / " + ops.length;
     try {
       await Store.commit(ops, function (d, n) { rs.textContent = "消しています… " + d + " / " + n; });
@@ -1869,8 +2156,6 @@ label.fld > span{
     renderShell();
     bindGlobal();
     loadCache();                       // 届くまでのつなぎに前回の内容を出す
-    $("ttl").textContent = meta.title;
-    document.title = meta.title;
     renderAll();
     if (!Store) {
       connError = "no-store";

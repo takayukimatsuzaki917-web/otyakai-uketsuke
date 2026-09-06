@@ -169,7 +169,13 @@
         var verb = o.op.split(".")[1];        // set / update / delete
         var dir = kind === "member" ? "members" : (kind === "group" ? "groups" : "meta");
 
-        if (kind === "meta") { patch["meta"] = o.data; return; }
+        if (kind === "meta") {
+          if (verb === "set") { patch["meta"] = o.data; return; }
+          /* update は項目ごとのパスにばらす。
+             会の名称を保存したときに開催日の設定まで消さないため */
+          Object.keys(o.data).forEach(function (k) { patch["meta/" + k] = o.data[k]; });
+          return;
+        }
 
         var path = dir + "/" + o.id;
         if (verb === "delete") { patch[path] = null; return; }

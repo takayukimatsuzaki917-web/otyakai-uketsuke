@@ -134,9 +134,19 @@ button{touch-action:manipulation}
   font-weight:600;font-size:1.06rem;letter-spacing:.06em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+/* いま受け付けている日。飾りではなく状態を示す札なので、
+   小さくても読み取れるよう色と地をつけて独立させる。
+   1日だけの会では要素ごと隠す（app.js の renderHead） */
 .brand .sub{
-  font-size:.7rem;letter-spacing:.14em;color:var(--ink-3);
-  text-transform:uppercase;
+  align-self:flex-start;
+  margin-top:2px;
+  padding:1px 8px;
+  border-radius:999px;
+  background:var(--accent-soft);
+  color:var(--accent-text);
+  border:1px solid var(--accent);
+  font-size:.74rem;font-weight:700;letter-spacing:.04em;
+  white-space:nowrap;
 }
 .total{
   display:flex;align-items:baseline;gap:2px;
