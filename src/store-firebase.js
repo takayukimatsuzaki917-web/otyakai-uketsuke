@@ -61,6 +61,8 @@
 
   window.ChakaiStore = {
     label: "Firebase",
+    /* 端末内の控えを会ごとに分ける鍵。別の会の名簿が混ざらないようにする */
+    cacheKey: "fb:" + resolveRoom(),
 
     /**
      * 保存先につなぎ、変化の購読を始める。

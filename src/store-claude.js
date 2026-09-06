@@ -77,6 +77,8 @@
 
   window.ChakaiStore = {
     label: "共有ストレージ",
+    /* 端末内の控えの鍵。Artifact は1つにつき保存先も1つなので固定でよい */
+    cacheKey: "artifact",
 
     connect: async function (h) {
       var api = null;

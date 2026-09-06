@@ -55,6 +55,11 @@
   var toastTimer = null;
   var settingsOpen = false;
   var settingsGid = null;   // 一括登録の対象組
+  /* 名簿の第一報が届いたか。届く前に「まだ空だ」と決めつけないための番人。
+     これが無いと、再読み込みの直後に一瞬だけ初期設定の案内が出てしまう */
+  var firstSnap = { groups: false, members: false };
+  var fromCache = false;    // いま出ているのが前回の控えか
+  var cacheTimer = null;
 
   /* =========================================================
      小さなユーティリティ
@@ -89,9 +94,52 @@
   /** 検索用の正規化。姓名の間の空白や大文字小文字の違いを無視する */
   function norm(s) { return String(s || "").replace(/[\s　]/g, "").toLowerCase(); }
 
+  /** 名簿がまだ届いていない間は true。この間は空の案内を出さない */
+  function isLoading() { return !firstSnap.groups || !firstSnap.members; }
+
   function errText(e) {
     if (!e) return "通信エラー";
     return e.code || e.message || "通信エラー";
+  }
+
+  /* =========================================================
+     前回の控え（この端末の中だけの控え）
+     -------------------------------------------------------------
+     再読み込みのたびに真っ白から始めると、名簿が届くまでの数秒が
+     「消えた」ように見えます。前回見えていた内容をこの端末に控えて
+     おき、開いた瞬間にそれを描いてから、届いた最新の内容で置き換えます。
+     控えはこの端末の中だけのもので、共有もされず、記録の正としても
+     扱いません（必ず保存先の内容で上書きされます）。
+     ========================================================= */
+  function cacheKey() {
+    return "chakai-uketsuke:" + ((Store && Store.cacheKey) || "default");
+  }
+
+  function loadCache() {
+    try {
+      var raw = window.localStorage.getItem(cacheKey());
+      if (!raw) return false;
+      var v = JSON.parse(raw);
+      if (!v || !Array.isArray(v.groups) || !Array.isArray(v.members)) return false;
+      if (!v.groups.length) return false;
+      groups = v.groups.map(mapGroup).sort(byOrder);
+      members = v.members.map(mapMember).sort(byOrder);
+      activeGid = groups.length ? groups[0].id : null;
+      if (v.title) meta.title = String(v.title);
+      fromCache = true;
+      return true;
+    } catch (e) { return false; }   // 使えない環境なら黙って諦める
+  }
+
+  function saveCache() {
+    if (cacheTimer) clearTimeout(cacheTimer);
+    cacheTimer = setTimeout(function () {
+      try {
+        window.localStorage.setItem(cacheKey(), JSON.stringify({
+          groups: groups, members: members, title: meta.title, savedAt: nowIso()
+        }));
+      } catch (e) { /* 容量超過や無効化。控えが無くても動作に支障はない */ }
+    }, 500);
   }
 
   /* =========================================================
@@ -170,14 +218,18 @@
         },
         groups: function (list) {
           groups = list.map(mapGroup).sort(byOrder);
+          firstSnap.groups = true;
           if (!activeGid || !groups.some(function (g) { return g.id === activeGid; })) {
             activeGid = groups.length ? groups[0].id : null;
           }
+          if (!isLoading()) { fromCache = false; saveCache(); }
           renderAll();
           if (settingsOpen) renderSettings();
         },
         members: function (list) {
           members = applyOverrides(list.map(mapMember)).sort(byOrder);
+          firstSnap.members = true;
+          if (!isLoading()) { fromCache = false; saveCache(); }
           renderAll();
           if (settingsOpen) renderSettings();
         },
@@ -278,6 +330,12 @@
   function renderConn() {
     var el = $("conn");
     if (!el) return;
+    /* 前回の控えを出している間は、それが最新でないことを明示する */
+    if (fromCache && isLoading() && !connError) {
+      el.innerHTML = '<div class="banner info"><b>前回ひらいたときの名簿です</b>' +
+        "最新の内容を受け取っています。数秒お待ちください。</div>";
+      return;
+    }
     if (connected) { el.innerHTML = ""; return; }
     if (connError === null) { el.innerHTML = ""; return; }  // 接続中はまだ何も出さない
     var msg = connError === "revoked"
@@ -317,8 +375,11 @@
       if (!connected && connError) {
         empty.innerHTML = connHelp ||
           "<h2>読み込めません</h2><p>保存先に接続できないため、名簿を表示できません。</p>";
-      } else if (!connected) {
-        empty.innerHTML = "<h2>接続しています</h2><p>共有データを読み込んでいます。</p>";
+      } else if (isLoading()) {
+        /* 第一報が届くまでは「空」と断定しない。
+           ここを飛ばすと、再読み込みのたびに初期設定の案内が明滅する */
+        empty.innerHTML = "<h2>名簿を読み込んでいます</h2>" +
+          "<p>保存先から最新の内容を受け取っています。しばらくお待ちください。</p>";
       } else if (!groups.length) {
         empty.innerHTML = "<h2>まず組をつくります</h2><p>設定画面で組（A・B・C…）を追加し、それぞれの名簿を貼り付けてください。当日は設定を開く必要はありません。</p>" +
           '<button class="btn primary" data-open-settings>設定をひらく</button>';
@@ -985,6 +1046,9 @@
   function boot() {
     renderShell();
     bindGlobal();
+    loadCache();                       // 届くまでのつなぎに前回の内容を出す
+    $("ttl").textContent = meta.title;
+    document.title = meta.title;
     renderAll();
     if (!Store) {
       connError = "no-store";
