@@ -173,6 +173,7 @@ src/
   store-claude.js          保存先アダプタ：Claude Artifact の共有ストレージ
 build/
   build-artifact.py        src/ から Artifact 版の1ファイルを組み立てる
+  dom-test.js              本物のDOM上で画面を操作して動作を確かめる
 dist/
   chakai-uketsuke-artifact.html   組み立てた Artifact 版（自動生成。直接編集しない）
 ```
@@ -182,6 +183,21 @@ dist/
 ```
 python build/build-artifact.py
 ```
+
+### 直したあとの確認
+
+本物のブラウザと同じ DOM の上で画面を操作し、ボタンが実際に反応するかを確かめます。
+
+```
+npm install     （初回のみ）
+npm test
+```
+
+設定画面の「組の名称」「削除」「リセット」が押しても何も起きない不具合を
+二度起こしました。原因はいずれも押した先の処理ではなく、押されたことを
+受け取る側（確認画面の重なり順、目印の取り違え）でした。作り物の DOM では
+見つけられなかったため、実際に押して確かめる形にしてあります。
+**画面まわりを直したら、publish の前に必ず `npm test` を通してください。**
 
 ## 設計のはなし
 

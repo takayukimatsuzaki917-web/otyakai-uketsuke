@@ -1,0 +1,13 @@
+{
+  "name": "chakai-uketsuke",
+  "version": "1.0.0",
+  "description": "お茶会当日の受付を複数端末で共有する Web アプリ",
+  "private": true,
+  "scripts": {
+    "test": "node build/dom-test.js",
+    "build": "python build/build-artifact.py"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

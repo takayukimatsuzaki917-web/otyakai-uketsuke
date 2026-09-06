@@ -1,0 +1,2 @@
+# 依存パッケージ（動作確認にのみ使う。npm install で入れ直せる）
+node_modules/

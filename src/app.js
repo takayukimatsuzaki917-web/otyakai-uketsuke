@@ -119,6 +119,25 @@
   /** 名簿がまだ届いていない間は true。この間は空の案内を出さない */
   function isLoading() { return !firstSnap.groups || !firstSnap.members; }
 
+  /**
+   * クリックされた場所から目印を探す。ただし root の中にある要素だけを拾う。
+   *
+   * closest() は <html> まで遡るため、外側に同じ目印が付いていると
+   * 無関係なクリックまで一致してしまう。実際、文字の大きさを
+   * <html data-size="…"> で表していたせいで、設定画面のどこを押しても
+   * [data-size] が <html> に一致し、それより下の分岐（リセット・組の名称・
+   * 組の削除）へ進めなくなっていた。同じ取り違えを繰り返さないための関門。
+   *
+   * @param {Event} e クリックの出来事
+   * @param {string} sel 探す目印（CSSセレクタ）
+   * @param {Element} root この要素の中にあるものだけを拾う
+   * @returns {Element|null}
+   */
+  function hit(e, sel, root) {
+    var el = e.target.closest(sel);
+    return (el && root.contains(el)) ? el : null;
+  }
+
   function errText(e) {
     if (!e) return "通信エラー";
     return e.code || e.message || "通信エラー";
@@ -635,7 +654,7 @@
     scrim.addEventListener("click", async function (e) {
       if (e.target === scrim || e.target.closest("[data-close]")) { close(); return; }
 
-      var seg = e.target.closest(".seg button");
+      var seg = hit(e, ".seg button", scrim);
       if (seg) {
         var v = seg.getAttribute("data-v");
         scrim.querySelectorAll(".seg button").forEach(function (b) {
@@ -782,9 +801,9 @@
           '<p class="lead">この端末だけの設定です。受付を担う方の見えやすさに合わせて選んでください。' +
             "選ぶとすぐ画面に反映されます。</p>" +
           '<div class="seg" role="group" aria-label="文字の大きさ">' +
-            '<button type="button" data-size="m" aria-pressed="' + (size === "m") + '">標準</button>' +
-            '<button type="button" data-size="l" aria-pressed="' + (size === "l") + '">大きく</button>' +
-            '<button type="button" data-size="xl" aria-pressed="' + (size === "xl") + '">もっと</button>' +
+            '<button type="button" data-set-size="m" aria-pressed="' + (size === "m") + '">標準</button>' +
+            '<button type="button" data-set-size="l" aria-pressed="' + (size === "l") + '">大きく</button>' +
+            '<button type="button" data-set-size="xl" aria-pressed="' + (size === "xl") + '">もっと</button>' +
           "</div>" +
         "</div>" +
 
@@ -807,27 +826,28 @@
     });
 
     panel.addEventListener("click", async function (e) {
-      if (e.target.closest("[data-close-settings]")) { closeSettings(); return; }
-      if (e.target.closest("#bulk-run"))      { await doBulkRegister(panel); return; }
-      if (e.target.closest("#add-group"))     { await doAddGroup(panel); return; }
-      if (e.target.closest("#save-title"))    { await doSaveTitle(panel); return; }
-      var sz = e.target.closest("[data-size]");
+      if (hit(e, "[data-close-settings]", panel)) { closeSettings(); return; }
+      if (hit(e, "#bulk-run", panel))      { await doBulkRegister(panel); return; }
+      if (hit(e, "#add-group", panel))     { await doAddGroup(panel); return; }
+      if (hit(e, "#save-title", panel))    { await doSaveTitle(panel); return; }
+      if (hit(e, "#reset-records", panel)) { await doResetRecords(panel); return; }
+      if (hit(e, "#reset-all", panel))     { await doResetAll(panel); return; }
+
+      var sz = hit(e, "[data-set-size]", panel);
       if (sz) {
-        applySize(sz.getAttribute("data-size"));
+        applySize(sz.getAttribute("data-set-size"));
         renderSettings();
         return;
       }
-      if (e.target.closest("#reset-records")) { await doResetRecords(panel); return; }
-      if (e.target.closest("#reset-all"))     { await doResetAll(panel); return; }
 
-      var ren = e.target.closest("[data-ren]");
+      var ren = hit(e, "[data-ren]", panel);
       if (ren) {
         var g = groups.find(function (x) { return x.id === ren.getAttribute("data-ren"); });
         if (g) openRename(g);
         return;
       }
 
-      var dg = e.target.closest("[data-delg]");
+      var dg = hit(e, "[data-delg]", panel);
       if (dg) { await doDeleteGroup(panel, dg.getAttribute("data-delg")); return; }
     });
   }
