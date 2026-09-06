@@ -73,6 +73,14 @@
   --sheet-shadow:0 -8px 40px rgba(0,0,0,.55);
 }
 
+/* 横の余白。iPhone を横向きにしたときの切り欠き（ノッチ）を足しておく。
+   これが無いと、横画面で文字が丸みの下に潜り込む */
+:root{
+  --gutter:14px;
+  --pad-l:calc(var(--gutter) + env(safe-area-inset-left, 0px));
+  --pad-r:calc(var(--gutter) + env(safe-area-inset-right, 0px));
+}
+
 *{box-sizing:border-box}
 body{
   background:var(--paper);
@@ -82,6 +90,9 @@ body{
   padding-bottom:env(safe-area-inset-bottom);
 }
 button,input,textarea,select{font:inherit;color:inherit}
+/* touch-action:manipulation で、二度押しによる拡大と押下の遅延をなくす。
+   受付では同じ場所を続けて叩くので、これが無いと画面が拡大してしまう */
+button{touch-action:manipulation}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.01ms !important;transition-duration:.01ms !important}
@@ -89,16 +100,22 @@ button,input,textarea,select{font:inherit;color:inherit}
 
 .wrap{max-width:640px;margin:0 auto}
 
-/* ---------- ヘッダー（会名 + 全体の到着数） ---------- */
-.topbar{
+/* ---------- ヘッダー（会名 + 全体の到着数） ----------
+   見出しと組タブは1つの塊として画面上部に貼り付ける。
+   別々に貼り付けて片方の top を固定値にすると、端末ごとの文字の高さの
+   違いで隙間ができたり重なったりするため、まとめて1つにしている */
+.stickyhead{
   position:sticky;top:0;z-index:30;
+  background:var(--paper);
+}
+.topbar{
   background:var(--surface);
   border-bottom:1px solid var(--line);
 }
 .topbar-inner{
   max-width:640px;margin:0 auto;
   display:flex;align-items:center;gap:12px;
-  padding:10px 14px;
+  padding:10px var(--pad-r) 10px var(--pad-l);
 }
 .brand{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
 .brand h1{
@@ -130,14 +147,13 @@ button,input,textarea,select{font:inherit;color:inherit}
 
 /* ---------- 組タブ ---------- */
 .tabs{
-  position:sticky;top:65px;z-index:29;
   background:var(--paper);
   border-bottom:1px solid var(--line);
 }
 .tabs-scroll{
   max-width:640px;margin:0 auto;
   display:flex;gap:8px;
-  padding:9px 14px;
+  padding:9px var(--pad-r) 9px var(--pad-l);
   overflow-x:auto;
   scrollbar-width:none;
 }
@@ -165,10 +181,13 @@ button,input,textarea,select{font:inherit;color:inherit}
 .toolbar{
   max-width:640px;margin:0 auto;
   display:flex;gap:8px;align-items:center;
-  padding:10px 14px 6px;
+  padding:10px var(--pad-r) 6px var(--pad-l);
 }
+/* min-width:0 が要。これが無いと、検索欄は中の文字（プレースホルダー）
+   より狭くなれず、隣の「未着のみ」を画面の外へ押し出してしまう */
 .search{
-  flex:1;display:flex;align-items:center;gap:8px;
+  flex:1 1 auto;min-width:0;
+  display:flex;align-items:center;gap:8px;
   background:var(--surface);
   border:1px solid var(--line);border-radius:10px;
   padding:0 10px;
@@ -176,16 +195,19 @@ button,input,textarea,select{font:inherit;color:inherit}
 }
 .search svg{width:18px;height:18px;stroke:var(--ink-3);fill:none;stroke-width:1.8;flex:none}
 .search input{
-  flex:1;min-width:0;height:100%;
+  flex:1 1 auto;min-width:0;height:100%;
   background:transparent;border:0;outline:none;
-  font-size:1rem;
+  font-size:1rem;                      /* 16px 未満にすると iOS が勝手に拡大する */
+  -webkit-appearance:none;appearance:none;border-radius:0;
 }
+/* 自前の×ボタンがあるので、iOS 標準の消去ボタンは隠す */
+.search input::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 .search button{
   flex:none;width:28px;height:28px;border:0;background:var(--surface-2);
   border-radius:50%;cursor:pointer;color:var(--ink-2);line-height:1;
 }
 .filter{
-  flex:none;height:46px;padding:0 14px;
+  flex:0 0 auto;height:46px;padding:0 14px;
   display:flex;align-items:center;gap:7px;
   background:var(--surface);border:1px solid var(--line);
   border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:500;
@@ -200,11 +222,18 @@ button,input,textarea,select{font:inherit;color:inherit}
 }
 .filter[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent)}
 .filter[aria-pressed="true"] .box::after{content:"";width:8px;height:4px;border-left:2px solid var(--surface);border-bottom:2px solid var(--surface);transform:rotate(-45deg) translateY(-1px)}
+.filter .lbl-short{display:none}
+/* iPhone SE ほどの幅では、ラベルを短くして検索欄に幅を譲る */
+@media (max-width:370px){
+  .filter{padding:0 11px;gap:6px}
+  .filter .lbl-long{display:none}
+  .filter .lbl-short{display:inline}
+}
 
 /* ---------- 組の内訳 ---------- */
 .breakdown{
   max-width:640px;margin:0 auto;
-  padding:2px 16px 10px;
+  padding:2px calc(var(--pad-r) + 2px) 10px calc(var(--pad-l) + 2px);
   display:flex;flex-wrap:wrap;gap:4px 14px;
   font-size:.8rem;color:var(--ink-2);
   font-variant-numeric:tabular-nums;
@@ -213,7 +242,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .breakdown .sep{color:var(--line-strong)}
 
 /* ---------- 名簿リスト ---------- */
-.list{list-style:none;margin:0;padding:0 14px 120px;max-width:640px;margin:0 auto}
+.list{list-style:none;margin:0 auto;padding:0 var(--pad-r) 130px var(--pad-l);max-width:640px}
 .item{
   display:flex;align-items:stretch;gap:0;
   background:var(--surface);
@@ -231,6 +260,8 @@ button,input,textarea,select{font:inherit;color:inherit}
   -webkit-tap-highlight-color:transparent;
 }
 .row:active{background:var(--surface-2)}
+/* 続けて叩いたときに氏名が範囲選択されて青くなるのを防ぐ */
+.row,.mark,.state{-webkit-user-select:none;user-select:none}
 .mark{
   flex:none;width:40px;height:40px;border-radius:50%;
   display:grid;place-items:center;
@@ -282,7 +313,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* ---------- 空状態 ---------- */
 .empty{
   max-width:640px;margin:0 auto;
-  padding:34px 22px 60px;text-align:center;color:var(--ink-2);
+  padding:34px calc(var(--pad-r) + 8px) 60px calc(var(--pad-l) + 8px);
+  text-align:center;color:var(--ink-2);
 }
 .empty h2{
   font-family:"Zen Old Mincho",serif;font-weight:600;
@@ -317,11 +349,15 @@ button,input,textarea,select{font:inherit;color:inherit}
 }
 .sheet{
   width:100%;max-width:640px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
   background:var(--surface);
   border-radius:18px 18px 0 0;
   box-shadow:var(--sheet-shadow);
   padding:8px 16px calc(20px + env(safe-area-inset-bottom));
-  max-height:88vh;overflow-y:auto;
+  max-height:88vh;                     /* dvh を解さない環境向けの控え */
+  max-height:88dvh;                    /* iOS のアドレスバーの伸縮に追従する */
+  overflow-y:auto;
   animation:rise .18s ease-out;
 }
 @keyframes rise{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
@@ -372,13 +408,13 @@ label.fld > span{
 }
 .panel-head .inner{
   max-width:640px;margin:0 auto;
-  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  display:flex;align-items:center;gap:10px;padding:10px var(--pad-r) 10px var(--pad-l);
 }
 .panel-head h2{
   flex:1;margin:0;font-family:"Zen Old Mincho",serif;
   font-size:1.05rem;font-weight:600;letter-spacing:.08em;
 }
-.panel-body{max-width:640px;margin:0 auto;padding:18px 14px calc(50px + env(safe-area-inset-bottom))}
+.panel-body{max-width:640px;margin:0 auto;padding:18px var(--pad-r) calc(50px + env(safe-area-inset-bottom)) var(--pad-l)}
 .card{
   background:var(--surface);border:1px solid var(--line);
   border-radius:14px;padding:16px;margin-bottom:14px;
@@ -420,7 +456,7 @@ label.fld > span{
 }
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);
-  bottom:calc(18px + env(safe-area-inset-bottom));
+  bottom:calc(26px + env(safe-area-inset-bottom));
   z-index:110;
   display:flex;align-items:center;gap:14px;
   background:var(--ink);color:var(--paper);
@@ -762,6 +798,8 @@ label.fld > span{
     var root = $("app-root");
     root.innerHTML =
       '<div class="wrap">' +
+        /* 見出しと組タブは1つの塊にして画面上部へ貼り付ける */
+        '<div class="stickyhead">' +
         '<header class="topbar"><div class="topbar-inner">' +
           '<div class="brand"><h1 id="ttl">' + esc(DEFAULT_TITLE) + "</h1>" +
             '<span class="sub">RECEPTION</span></div>' +
@@ -773,16 +811,18 @@ label.fld > span{
         "</div></header>" +
 
         '<nav class="tabs" id="tabs-wrap" hidden><div class="tabs-scroll" id="tabs" role="tablist"></div></nav>' +
+        "</div>" +
         '<div id="conn"></div>' +
 
         '<div class="toolbar" id="toolbar" hidden>' +
           '<div class="search">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>' +
-            '<input id="q" type="search" inputmode="search" placeholder="氏名で全組から検索" aria-label="氏名で全組から検索">' +
+            '<input id="q" type="search" inputmode="search" placeholder="氏名で検索" aria-label="氏名で全組から検索">' +
             '<button id="q-clear" hidden aria-label="検索を消す">×</button>' +
           "</div>" +
           '<button class="filter" id="only-waiting" aria-pressed="false">' +
-            '<span class="box" aria-hidden="true"></span>未着のみ</button>' +
+            '<span class="box" aria-hidden="true"></span>' +
+            '<span class="lbl-long">未着のみ</span><span class="lbl-short">未着</span></button>' +
         "</div>" +
 
         '<div class="breakdown" id="breakdown" hidden></div>' +

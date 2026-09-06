@@ -150,6 +150,8 @@
     var root = $("app-root");
     root.innerHTML =
       '<div class="wrap">' +
+        /* 見出しと組タブは1つの塊にして画面上部へ貼り付ける */
+        '<div class="stickyhead">' +
         '<header class="topbar"><div class="topbar-inner">' +
           '<div class="brand"><h1 id="ttl">' + esc(DEFAULT_TITLE) + "</h1>" +
             '<span class="sub">RECEPTION</span></div>' +
@@ -161,16 +163,18 @@
         "</div></header>" +
 
         '<nav class="tabs" id="tabs-wrap" hidden><div class="tabs-scroll" id="tabs" role="tablist"></div></nav>' +
+        "</div>" +
         '<div id="conn"></div>' +
 
         '<div class="toolbar" id="toolbar" hidden>' +
           '<div class="search">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>' +
-            '<input id="q" type="search" inputmode="search" placeholder="氏名で全組から検索" aria-label="氏名で全組から検索">' +
+            '<input id="q" type="search" inputmode="search" placeholder="氏名で検索" aria-label="氏名で全組から検索">' +
             '<button id="q-clear" hidden aria-label="検索を消す">×</button>' +
           "</div>" +
           '<button class="filter" id="only-waiting" aria-pressed="false">' +
-            '<span class="box" aria-hidden="true"></span>未着のみ</button>' +
+            '<span class="box" aria-hidden="true"></span>' +
+            '<span class="lbl-long">未着のみ</span><span class="lbl-short">未着</span></button>' +
         "</div>" +
 
         '<div class="breakdown" id="breakdown" hidden></div>' +
