@@ -180,7 +180,12 @@ const MEMBERS = [
   check("切り替えには確認画面が出る",
     /2日目.*に切り替えます/.test(dayScrim?.querySelector("h3")?.textContent || ""),
     dayScrim?.querySelector("h3")?.textContent || "出ない");
-  check("全員の画面が変わる旨を伝える", /全員の画面/.test(dayScrim?.textContent || ""));
+  const alertEl = dayScrim?.querySelector(".warn");
+  check("全員の画面が変わる旨を赤字で伝える",
+    !!alertEl && /全員の画面が「2日目」に切り替わります/.test(alertEl.textContent),
+    alertEl ? alertEl.textContent.trim() : "赤字の一文が無い");
+  check("赤字は見出しのすぐ下に置かれる",
+    dayScrim?.querySelector("h3 + .warn") === alertEl);
 
   const n0 = commits.length;
   click(dayScrim.querySelector("[data-yes]"));

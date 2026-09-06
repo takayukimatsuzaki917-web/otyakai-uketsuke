@@ -537,8 +537,10 @@ label.fld > span{
 .confirm-box .what li{display:flex;justify-content:space-between;gap:14px}
 .confirm-box .what b{font-variant-numeric:tabular-nums}
 .confirm-box .warn{
-  margin:0 0 18px;font-size:.86rem;line-height:1.7;color:var(--danger);font-weight:700;
+  margin:0 0 18px;font-size:.92rem;line-height:1.7;color:var(--danger);font-weight:700;
 }
+/* 見出しのすぐ下に来る赤字は、見出しとひと続きに見えるよう間を詰める */
+.confirm-box h3 + .warn{margin-top:-4px;margin-bottom:14px}
 .confirm-box.tone-danger{border-top:4px solid var(--danger)}
 
 /* ---------- 危険な操作のまとまり ---------- */

@@ -674,7 +674,9 @@
      確認ダイアログ
      取り消せない操作は必ずここを通す。何がいくつ消えるかを数字で見せる。
      （iframe内では標準の confirm() が使えないため自前で用意）
-     @param {Object} o {title, body, what:[{k,v}], warn, ok, tone}
+     @param {Object} o {title, alert, body, what:[{k,v}], warn, ok, tone}
+       alert … 見出しのすぐ下に赤字で出す一文（いちばん伝えたいこと）
+       warn  … 数字の下に赤字で添える一文（取り消せない旨など）
      @returns {Promise<boolean>} 「実行する」を押したら true
      ========================================================= */
   function confirmDialog(o) {
@@ -690,6 +692,7 @@
       scrim.innerHTML =
         '<div class="confirm-box' + (o.tone === "danger" ? " tone-danger" : "") + '" role="dialog" aria-modal="true">' +
           (o.title ? "<h3>" + esc(o.title) + "</h3>" : "") +
+          (o.alert ? '<p class="warn">' + esc(o.alert) + "</p>" : "") +
           (o.body ? "<p>" + esc(o.body) + "</p>" : "") +
           whatHtml +
           (o.warn ? '<p class="warn">' + esc(o.warn) + "</p>" : "") +
@@ -1004,8 +1007,9 @@
 
     var ok = await confirmDialog({
       title: "「" + d.name + "」に切り替えます",
-      body: "この受付帳を開いている全員の画面が「" + d.name + "」に切り替わります。" +
-        "受付の途中でないことを確かめてください。",
+      /* いちばん伝えたいのは「自分の端末だけの話ではない」こと。赤字で先に出す */
+      alert: "この受付帳を開いている全員の画面が「" + d.name + "」に切り替わります。",
+      body: "受付の途中でないことを確かめてください。",
       what: [
         { k: "切り替え先", v: d.name },
         { k: "その日の組", v: groupsOfDay(d.id).length + " 組" },
