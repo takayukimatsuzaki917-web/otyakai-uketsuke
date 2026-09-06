@@ -33,7 +33,9 @@
   var STATUS_LABEL = { waiting: "未到着", arrived: "到着", absent: "欠席" };
 
   var DEFAULT_TITLE = "茶会受付帳";
-  var TOAST_MS = 5000;          // トーストと「取消」を出しておく時間
+  var TOAST_MS = 8000;          // トーストと「取消」を出しておく時間。押し間違いに気づく余裕をとる
+  var SIZE_KEY = "chakai-uketsuke:size";   // 文字の大きさ（この端末だけの設定）
+  var SIZES = ["m", "l", "xl"];
   var OVERRIDE_HOLD_MS = 1200;  // 書き込み後、ローカル値を優先し続ける時間
 
   var Store = window.ChakaiStore;
@@ -60,6 +62,8 @@
   var firstSnap = { groups: false, members: false };
   var fromCache = false;    // いま出ているのが前回の控えか
   var cacheTimer = null;
+  var lastSyncAt = null;    // 最後に名簿が届いた時刻
+  var refreshing = false;   // 「更新」を押して確認している最中か
 
   /* =========================================================
      小さなユーティリティ
@@ -93,6 +97,24 @@
 
   /** 検索用の正規化。姓名の間の空白や大文字小文字の違いを無視する */
   function norm(s) { return String(s || "").replace(/[\s　]/g, "").toLowerCase(); }
+
+  /* ---------------------------------------------------------
+     文字の大きさ（標準 / 大きく / もっと大きく）
+     受付を担う方の見えやすさに合わせて変えられるようにする。
+     端末ごとの設定なので、共有データには保存しない。
+     --------------------------------------------------------- */
+  function currentSize() {
+    try {
+      var v = window.localStorage.getItem(SIZE_KEY);
+      return SIZES.indexOf(v) >= 0 ? v : "m";
+    } catch (e) { return "m"; }
+  }
+
+  function applySize(size) {
+    if (SIZES.indexOf(size) < 0) size = "m";
+    document.documentElement.setAttribute("data-size", size);
+    try { window.localStorage.setItem(SIZE_KEY, size); } catch (e) { /* 保存できなくても表示は変わる */ }
+  }
 
   /** 名簿がまだ届いていない間は true。この間は空の案内を出さない */
   function isLoading() { return !firstSnap.groups || !firstSnap.members; }
@@ -177,7 +199,15 @@
             '<span class="lbl-long">未着のみ</span><span class="lbl-short">未着</span></button>' +
         "</div>" +
 
-        '<div class="breakdown" id="breakdown" hidden></div>' +
+        /* 到着状況と「更新」。高齢の方が「これで合っているか」を
+           確かめられるよう、いつも同じ場所に置く */
+        '<div class="statusbar">' +
+          '<div class="counts" id="breakdown"></div>' +
+          '<button class="refresh" id="btn-refresh">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+              '<path d="M20 11a8 8 0 1 0-.6 4"></path><path d="M20 4v7h-7"></path></svg>' +
+            "<span>更新</span></button>" +
+        "</div>" +
         '<ul class="list" id="list"></ul>' +
         '<div class="empty" id="empty" hidden></div>' +
       "</div>";
@@ -223,6 +253,7 @@
         groups: function (list) {
           groups = list.map(mapGroup).sort(byOrder);
           firstSnap.groups = true;
+          lastSyncAt = nowIso();
           if (!activeGid || !groups.some(function (g) { return g.id === activeGid; })) {
             activeGid = groups.length ? groups[0].id : null;
           }
@@ -233,6 +264,7 @@
         members: function (list) {
           members = applyOverrides(list.map(mapMember)).sort(byOrder);
           firstSnap.members = true;
+          lastSyncAt = nowIso();
           if (!isLoading()) { fromCache = false; saveCache(); }
           renderAll();
           if (settingsOpen) renderSettings();
@@ -328,7 +360,65 @@
     renderConn();
     renderTotal();
     renderTabs();
+    renderBar();
     renderList();
+  }
+
+  /**
+   * 到着状況と「更新」ボタンの行。
+   * 名簿が無いときや読み込み中でも消さない。「更新」がいつも同じ場所に
+   * あることが、迷わないための拠りどころになる。
+   */
+  function renderBar() {
+    var bd = $("breakdown"), btn = $("btn-refresh");
+    if (!bd || !btn) return;
+
+    var parts = [];
+    if (query) {
+      var hit = members.filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; });
+      parts.push("「" + esc(query) + "」に一致 <b>" + hit.length + "</b> 件（全組から）");
+    } else if (isLoading()) {
+      parts.push("読み込んでいます…");
+    } else if (!members.length) {
+      parts.push("名簿がまだありません");
+    } else {
+      var t = tally(membersOf(activeGid));
+      parts.push("到着 <b>" + t.arrived + "</b>");
+      parts.push("未到着 <b>" + t.waiting + "</b>");
+      if (t.absent) parts.push("欠席 <b>" + t.absent + "</b>");
+      parts.push("名簿 <b>" + t.total + "</b> 名");
+    }
+    if (lastSyncAt) parts.push('<span class="sync">' + esc(hhmm(lastSyncAt)) + " 現在</span>");
+
+    bd.innerHTML = parts.map(function (p) { return "<span>" + p + "</span>"; })
+      .join('<span class="sep" aria-hidden="true">|</span>');
+
+    btn.setAttribute("aria-busy", String(refreshing));
+    btn.disabled = refreshing;
+    /* ラベルが見つからなくても描画全体を止めないようにする */
+    var lbl = btn.querySelector("span");
+    if (lbl) lbl.textContent = refreshing ? "確認中" : "更新";
+  }
+
+  /**
+   * 「更新」ボタンの中身。
+   * 自動でも届いているが、押して確かめられること自体が安心につながる。
+   * 実際に保存先から読み直し、結果を必ず言葉で返す。
+   */
+  async function doRefresh() {
+    if (refreshing) return;
+    refreshing = true;
+    renderBar();
+    try {
+      if (Store && Store.refresh) await Store.refresh();
+      lastSyncAt = nowIso();
+      connected = true; connError = null;
+      showToast("最新の名簿にしました（" + hhmm(lastSyncAt) + " 現在）");
+    } catch (e) {
+      showToast("最新にできませんでした（" + errText(e) + "）。電波の届く場所でもう一度お試しください。");
+    }
+    refreshing = false;
+    renderAll();
   }
 
   function renderConn() {
@@ -370,11 +460,11 @@
 
   function renderList() {
     var list = $("list"), empty = $("empty");
-    var toolbar = $("toolbar"), bd = $("breakdown");
+    var toolbar = $("toolbar");
 
     /* --- 名簿がまだ無い／つながっていない場合の案内 --- */
     if (!groups.length || !members.length) {
-      toolbar.hidden = true; bd.hidden = true; list.innerHTML = "";
+      toolbar.hidden = true; list.innerHTML = "";
       empty.hidden = false;
       if (!connected && connError) {
         empty.innerHTML = connHelp ||
@@ -402,19 +492,6 @@
     var src = searching
       ? members.filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; })
       : membersOf(activeGid);
-
-    if (searching) {
-      bd.hidden = false;
-      bd.innerHTML = "<span>「" + esc(query) + "」に一致 <b>" + src.length + "</b> 件（全組から検索）</span>";
-    } else {
-      var t = tally(src);
-      bd.hidden = false;
-      bd.innerHTML =
-        "<span>到着 <b>" + t.arrived + "</b></span>" +
-        '<span class="sep">|</span><span>未到着 <b>' + t.waiting + "</b></span>" +
-        (t.absent ? '<span class="sep">|</span><span>欠席 <b>' + t.absent + "</b></span>" : "") +
-        '<span class="sep">|</span><span>名簿 <b>' + t.total + "</b> 名</span>";
-    }
 
     var shown = onlyWaiting ? src.filter(function (m) { return m.status === WAITING; }) : src;
 
@@ -447,7 +524,7 @@
             '<span class="body">' + gtag + '<span class="nm">' + esc(m.name) + "</span>" + noteHtml + "</span>" +
             '<span class="state">' + right + "</span>" +
           "</button>" +
-          '<button class="more" data-act="detail" data-id="' + esc(m.id) + '" aria-label="' + esc(m.name) + ' の詳細">⋯</button>' +
+          '<button class="more" data-act="detail" data-id="' + esc(m.id) + '" aria-label="' + esc(m.name) + ' の欠席・備考">変更</button>' +
         "</li>";
     }).join("");
   }
@@ -634,6 +711,7 @@
 
     var whole = tally(members);
     var marked = members.filter(function (m) { return m.status !== WAITING || m.note; }).length;
+    var size = currentSize();
 
     var inputStyle = 'style="flex:1;min-width:0;padding:12px;background:var(--paper);' +
       'border:1px solid var(--line-strong);border-radius:10px;font-size:1rem"';
@@ -698,6 +776,18 @@
           "</div>" +
         "</div>" +
 
+        /* --- 文字の大きさ --- */
+        '<div class="card">' +
+          "<h3>文字の大きさ</h3>" +
+          '<p class="lead">この端末だけの設定です。受付を担う方の見えやすさに合わせて選んでください。' +
+            "選ぶとすぐ画面に反映されます。</p>" +
+          '<div class="seg" role="group" aria-label="文字の大きさ">' +
+            '<button type="button" data-size="m" aria-pressed="' + (size === "m") + '">標準</button>' +
+            '<button type="button" data-size="l" aria-pressed="' + (size === "l") + '">大きく</button>' +
+            '<button type="button" data-size="xl" aria-pressed="' + (size === "xl") + '">もっと</button>' +
+          "</div>" +
+        "</div>" +
+
         /* --- リセット --- */
         '<div class="card danger-zone">' +
           "<h3>リセット</h3>" +
@@ -721,6 +811,12 @@
       if (e.target.closest("#bulk-run"))      { await doBulkRegister(panel); return; }
       if (e.target.closest("#add-group"))     { await doAddGroup(panel); return; }
       if (e.target.closest("#save-title"))    { await doSaveTitle(panel); return; }
+      var sz = e.target.closest("[data-size]");
+      if (sz) {
+        applySize(sz.getAttribute("data-size"));
+        renderSettings();
+        return;
+      }
       if (e.target.closest("#reset-records")) { await doResetRecords(panel); return; }
       if (e.target.closest("#reset-all"))     { await doResetAll(panel); return; }
 
@@ -1020,6 +1116,8 @@
       }
     });
 
+    $("btn-refresh").addEventListener("click", doRefresh);
+
     $("only-waiting").addEventListener("click", function () {
       onlyWaiting = !onlyWaiting;
       this.setAttribute("aria-pressed", String(onlyWaiting));
@@ -1048,6 +1146,7 @@
      起動
      ========================================================= */
   function boot() {
+    applySize(currentSize());          // 前回選んだ文字の大きさを最初に当てる
     renderShell();
     bindGlobal();
     loadCache();                       // 届くまでのつなぎに前回の内容を出す

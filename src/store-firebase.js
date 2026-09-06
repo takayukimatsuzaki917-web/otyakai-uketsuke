@@ -58,6 +58,7 @@
   }
 
   var base = null;   // chakai/<会のID> を指す参照
+  var H = null;      // 画面へ知らせるためのコールバック一式
 
   window.ChakaiStore = {
     label: "Firebase",
@@ -69,6 +70,7 @@
      * @param {Object} h {meta, groups, members, status} の各コールバック
      */
     connect: async function (h) {
+      H = h;
       var fb = CFG.firebase || {};
 
       /* --- 設定と読み込みの確認 --- */
@@ -134,6 +136,21 @@
       }
 
       return { ok: true };
+    },
+
+    /**
+     * 「更新」ボタン用。保存先から今の中身を読み直して画面へ渡す。
+     * 普段は自動で届いているが、押して確かめられること自体に意味がある。
+     * 一度に丸ごと読むので、届いていない変化があればここで必ず揃う。
+     */
+    refresh: function () {
+      if (!base || !H) return Promise.reject({ code: "not-connected" });
+      return base.once("value").then(function (s) {
+        var v = s.val() || {};
+        H.meta(v.meta || null);
+        H.groups(toList(v.groups));
+        H.members(toList(v.members));
+      });
     },
 
     /**

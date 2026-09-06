@@ -20,6 +20,7 @@
   var RETRY = 3;         // 一時的な失敗をやり直す回数
 
   var db = null;
+  var H = null;      // 画面へ知らせるためのコールバック一式
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
@@ -81,6 +82,7 @@
     cacheKey: "artifact",
 
     connect: async function (h) {
+      H = h;
       var api = null;
       try {
         api = (window.claude && window.claude.use) ? await window.claude.use("db") : null;
@@ -106,6 +108,17 @@
         function (e) { h.status(false, (e && e.code) || "unavailable"); });
 
       return { ok: true };
+    },
+
+    /** 「更新」ボタン用。保存先から今の中身を読み直して画面へ渡す */
+    refresh: async function () {
+      if (!db || !H) throw { code: "not_granted" };
+      var meta = await runTask(function () { return db.doc(DOC_META).get(); });
+      var gs = await runTask(function () { return db.collection(COL_GROUPS).get(); });
+      var ms = await runTask(function () { return db.collection(COL_MEMBERS).get(); });
+      H.meta(meta.exists ? meta.data() : null);
+      H.groups(gs.docs.map(toObj));
+      H.members(ms.docs.map(toObj));
     },
 
     commit: function (ops, onProgress) {
