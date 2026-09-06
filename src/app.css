@@ -1,0 +1,474 @@
+/* ===========================================================
+   デザイントークン
+   - 地色は「和紙」に寄せたごく淡い緑みのグレー
+   - 到着 = 青竹(緑) / 欠席 = 枯茶(黄土) と役割で色を分ける
+   - :root に全トークンを定義 → ダークは値だけ差し替える
+   =========================================================== */
+:root{
+  --paper:#f2f5f0;
+  --surface:#ffffff;
+  --surface-2:#e9ede7;
+  --ink:#1a201b;
+  --ink-2:#4c564e;
+  --ink-3:#7a847c;
+  --line:#d6ddd4;
+  --line-strong:#c2ccbf;
+  --accent:#2c6b47;
+  --on-accent:#ffffff;
+  --accent-text:#215137;
+  --accent-soft:#dceade;
+  --absent:#96682c;
+  --absent-text:#7d551f;
+  --absent-soft:#f0e6d3;
+  --danger:#a03b32;
+  --shadow:0 1px 2px rgba(26,32,27,.06), 0 8px 24px rgba(26,32,27,.07);
+  --sheet-shadow:0 -8px 40px rgba(26,32,27,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#131714;
+    --surface:#1b211c;
+    --surface-2:#242b25;
+    --ink:#e9efe9;
+    --ink-2:#aab5ab;
+    --ink-3:#7f8a81;
+    --line:#2e372f;
+    --line-strong:#3c463d;
+    --accent:#6dbf8d;
+    --on-accent:#0f1610;
+    --accent-text:#9ad8b4;
+    --accent-soft:#1d3629;
+    --absent:#d3a361;
+    --absent-text:#e0bb85;
+    --absent-soft:#372c1b;
+    --danger:#e08078;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --sheet-shadow:0 -8px 40px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131714;
+  --surface:#1b211c;
+  --surface-2:#242b25;
+  --ink:#e9efe9;
+  --ink-2:#aab5ab;
+  --ink-3:#7f8a81;
+  --line:#2e372f;
+  --line-strong:#3c463d;
+  --accent:#6dbf8d;
+  --on-accent:#0f1610;
+  --accent-text:#9ad8b4;
+  --accent-soft:#1d3629;
+  --absent:#d3a361;
+  --absent-text:#e0bb85;
+  --absent-soft:#372c1b;
+  --danger:#e08078;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --sheet-shadow:0 -8px 40px rgba(0,0,0,.55);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+
+.wrap{max-width:640px;margin:0 auto}
+
+/* ---------- ヘッダー（会名 + 全体の到着数） ---------- */
+.topbar{
+  position:sticky;top:0;z-index:30;
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+.topbar-inner{
+  max-width:640px;margin:0 auto;
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;
+}
+.brand{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.brand h1{
+  margin:0;
+  font-family:"Zen Old Mincho",serif;
+  font-weight:600;font-size:1.06rem;letter-spacing:.06em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.brand .sub{
+  font-size:.7rem;letter-spacing:.14em;color:var(--ink-3);
+  text-transform:uppercase;
+}
+.total{
+  display:flex;align-items:baseline;gap:2px;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.total .n{font-size:1.5rem;font-weight:700;color:var(--accent-text);line-height:1}
+.total .d{font-size:.95rem;color:var(--ink-3)}
+.icon-btn{
+  flex:none;
+  width:44px;height:44px;
+  display:grid;place-items:center;
+  background:transparent;border:1px solid var(--line);border-radius:10px;
+  cursor:pointer;
+}
+.icon-btn:active{background:var(--surface-2)}
+.icon-btn svg{width:22px;height:22px;stroke:var(--ink-2);fill:none;stroke-width:1.7}
+
+/* ---------- 組タブ ---------- */
+.tabs{
+  position:sticky;top:65px;z-index:29;
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+}
+.tabs-scroll{
+  max-width:640px;margin:0 auto;
+  display:flex;gap:8px;
+  padding:9px 14px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.tabs-scroll::-webkit-scrollbar{display:none}
+.tab{
+  flex:none;
+  display:flex;align-items:baseline;gap:7px;
+  padding:9px 14px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:999px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.tab .g{font-weight:700;font-size:1rem}
+.tab .c{font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.tab[aria-selected="true"]{
+  background:var(--accent);border-color:var(--accent);
+  color:var(--on-accent);
+}
+.tab[aria-selected="true"] .c{color:inherit;opacity:.8}
+.tab.done{border-color:var(--accent);}
+
+/* ---------- 検索 / 絞り込み ---------- */
+.toolbar{
+  max-width:640px;margin:0 auto;
+  display:flex;gap:8px;align-items:center;
+  padding:10px 14px 6px;
+}
+.search{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;
+  padding:0 10px;
+  height:46px;
+}
+.search svg{width:18px;height:18px;stroke:var(--ink-3);fill:none;stroke-width:1.8;flex:none}
+.search input{
+  flex:1;min-width:0;height:100%;
+  background:transparent;border:0;outline:none;
+  font-size:1rem;
+}
+.search button{
+  flex:none;width:28px;height:28px;border:0;background:var(--surface-2);
+  border-radius:50%;cursor:pointer;color:var(--ink-2);line-height:1;
+}
+.filter{
+  flex:none;height:46px;padding:0 14px;
+  display:flex;align-items:center;gap:7px;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:500;
+  white-space:nowrap;
+}
+.filter[aria-pressed="true"]{
+  background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text);
+}
+.filter .box{
+  width:16px;height:16px;border:1.8px solid var(--line-strong);border-radius:4px;
+  display:grid;place-items:center;flex:none;
+}
+.filter[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent)}
+.filter[aria-pressed="true"] .box::after{content:"";width:8px;height:4px;border-left:2px solid var(--surface);border-bottom:2px solid var(--surface);transform:rotate(-45deg) translateY(-1px)}
+
+/* ---------- 組の内訳 ---------- */
+.breakdown{
+  max-width:640px;margin:0 auto;
+  padding:2px 16px 10px;
+  display:flex;flex-wrap:wrap;gap:4px 14px;
+  font-size:.8rem;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.breakdown b{font-weight:700;color:var(--ink)}
+.breakdown .sep{color:var(--line-strong)}
+
+/* ---------- 名簿リスト ---------- */
+.list{list-style:none;margin:0;padding:0 14px 120px;max-width:640px;margin:0 auto}
+.item{
+  display:flex;align-items:stretch;gap:0;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  margin-bottom:8px;
+  overflow:hidden;
+}
+.row{
+  flex:1;min-width:0;
+  display:flex;align-items:center;gap:13px;
+  padding:13px 4px 13px 13px;
+  min-height:70px;
+  background:transparent;border:0;text-align:left;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.row:active{background:var(--surface-2)}
+.mark{
+  flex:none;width:40px;height:40px;border-radius:50%;
+  display:grid;place-items:center;
+  border:2px solid var(--line-strong);
+  color:var(--ink-3);
+  font-size:1rem;font-weight:700;
+}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.nm{
+  font-size:1.24rem;font-weight:500;line-height:1.25;
+  word-break:break-word;
+}
+.note{
+  font-size:.8rem;color:var(--absent-text);
+  display:flex;gap:5px;align-items:flex-start;
+  line-height:1.35;
+}
+.note .tag{
+  flex:none;background:var(--absent-soft);color:var(--absent-text);
+  border-radius:4px;padding:1px 5px;font-size:.68rem;font-weight:700;letter-spacing:.06em;
+}
+.gtag{
+  font-size:.72rem;color:var(--ink-3);letter-spacing:.08em;font-weight:700;
+}
+.state{
+  flex:none;padding-right:6px;text-align:right;
+  display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+}
+.time{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent-text)}
+.state small{font-size:.7rem;color:var(--ink-3);letter-spacing:.06em}
+.more{
+  flex:none;width:46px;
+  background:transparent;border:0;border-left:1px solid var(--line);
+  cursor:pointer;color:var(--ink-3);font-size:1.15rem;letter-spacing:.1em;
+}
+.more:active{background:var(--surface-2)}
+
+/* 到着済み：面を淡い緑で塗り、丸印を塗りつぶす */
+.item.arrived{border-color:var(--accent);background:var(--accent-soft)}
+.item.arrived .mark{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.item.arrived .nm{font-weight:700}
+.item.arrived .more{border-left-color:var(--accent)}
+
+/* 欠席：彩度を落とし、名前に取り消し線 */
+.item.absent{background:var(--surface);border-style:dashed;border-color:var(--line-strong)}
+.item.absent .nm{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1.5px;font-weight:400}
+.item.absent .mark{border-color:var(--absent);color:var(--absent-text);font-size:.85rem}
+
+/* ---------- 空状態 ---------- */
+.empty{
+  max-width:640px;margin:0 auto;
+  padding:34px 22px 60px;text-align:center;color:var(--ink-2);
+}
+.empty h2{
+  font-family:"Zen Old Mincho",serif;font-weight:600;
+  font-size:1.15rem;margin:0 0 8px;color:var(--ink);letter-spacing:.04em;
+}
+.empty p{margin:0 auto 18px;max-width:30em;font-size:.92rem;line-height:1.75}
+
+/* ---------- ボタン ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:50px;padding:0 20px;
+  border-radius:11px;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink);
+  font-size:1rem;font-weight:700;cursor:pointer;
+}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* ---------- ボトムシート / 全画面パネル ---------- */
+.scrim{
+  position:fixed;inset:0;z-index:60;
+  background:rgba(16,22,17,.5);
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.sheet{
+  width:100%;max-width:640px;
+  background:var(--surface);
+  border-radius:18px 18px 0 0;
+  box-shadow:var(--sheet-shadow);
+  padding:8px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height:88vh;overflow-y:auto;
+  animation:rise .18s ease-out;
+}
+@keyframes rise{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+.grabber{width:38px;height:4px;border-radius:2px;background:var(--line-strong);margin:6px auto 14px}
+.sheet h2{
+  margin:0 0 2px;font-size:1.3rem;font-weight:700;line-height:1.3;
+  word-break:break-word;
+}
+.sheet .who{font-size:.78rem;color:var(--ink-3);letter-spacing:.1em;margin-bottom:16px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.seg button{
+  min-height:62px;border-radius:11px;
+  border:1.5px solid var(--line);background:var(--surface);
+  cursor:pointer;font-size:.98rem;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+}
+.seg button small{font-size:.66rem;font-weight:500;color:var(--ink-3);letter-spacing:.04em}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text)}
+.seg button[data-v="absent"][aria-pressed="true"]{background:var(--absent-soft);border-color:var(--absent);color:var(--absent-text)}
+.seg button[aria-pressed="true"] small{color:inherit;opacity:.75}
+
+label.fld{display:block;margin-bottom:16px}
+label.fld > span{
+  display:block;font-size:.78rem;font-weight:700;letter-spacing:.08em;
+  color:var(--ink-2);margin-bottom:6px;
+}
+.fld input[type="text"],.fld textarea,.fld select{
+  width:100%;padding:12px;
+  background:var(--paper);
+  border:1px solid var(--line-strong);border-radius:10px;
+  font-size:1rem;line-height:1.6;
+  outline:none;
+}
+.fld textarea{resize:vertical;min-height:76px}
+.fld .hint{font-size:.75rem;color:var(--ink-3);margin-top:5px;line-height:1.6}
+.sheet-actions{display:flex;gap:8px;margin-top:4px}
+.sheet-actions .btn{flex:1}
+
+/* ---------- 設定画面 ---------- */
+.panel{
+  position:fixed;inset:0;z-index:70;
+  background:var(--paper);
+  overflow-y:auto;
+}
+.panel-head{
+  position:sticky;top:0;z-index:5;
+  background:var(--surface);border-bottom:1px solid var(--line);
+}
+.panel-head .inner{
+  max-width:640px;margin:0 auto;
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+}
+.panel-head h2{
+  flex:1;margin:0;font-family:"Zen Old Mincho",serif;
+  font-size:1.05rem;font-weight:600;letter-spacing:.08em;
+}
+.panel-body{max-width:640px;margin:0 auto;padding:18px 14px calc(50px + env(safe-area-inset-bottom))}
+.card{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:16px;margin-bottom:14px;
+}
+.card > h3{
+  margin:0 0 4px;font-size:1rem;font-weight:700;letter-spacing:.03em;
+}
+.card > .lead{margin:0 0 14px;font-size:.82rem;color:var(--ink-2);line-height:1.7}
+.glist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.glist li{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;background:var(--paper);
+  border:1px solid var(--line);border-radius:10px;
+}
+.glist .gn{flex:1;min-width:0;font-weight:700;font-size:1.02rem;word-break:break-word}
+.glist .gc{font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.glist button{
+  flex:none;min-height:38px;padding:0 12px;border-radius:8px;
+  border:1px solid var(--line-strong);background:var(--surface);
+  font-size:.82rem;font-weight:700;cursor:pointer;
+}
+.row-add{display:flex;gap:8px;margin-top:12px}
+.row-add input{flex:1;min-width:0}
+.status{font-size:.82rem;color:var(--ink-2);margin-top:10px;line-height:1.6;min-height:1.4em}
+.status.err{color:var(--danger);font-weight:700}
+
+/* ---------- 通知バナー / トースト ---------- */
+.banner{
+  max-width:640px;margin:12px auto 0;
+  padding:12px 14px;border-radius:11px;
+  background:var(--absent-soft);color:var(--absent-text);
+  font-size:.85rem;line-height:1.65;
+  border:1px solid var(--absent);
+}
+.banner b{display:block;margin-bottom:3px;font-size:.9rem;color:var(--ink)}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  z-index:80;
+  display:flex;align-items:center;gap:14px;
+  background:var(--ink);color:var(--paper);
+  padding:12px 12px 12px 18px;border-radius:12px;
+  font-size:.92rem;font-weight:500;
+  box-shadow:var(--shadow);
+  max-width:calc(100% - 28px);
+  animation:rise .16s ease-out;
+}
+.toast button{
+  flex:none;background:transparent;border:1px solid rgba(255,255,255,.35);
+  color:inherit;border-radius:8px;padding:7px 12px;font-weight:700;font-size:.85rem;
+  cursor:pointer;
+}
+.toast .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.confirm-box{
+  background:var(--surface);border-radius:16px;padding:22px;
+  max-width:360px;width:calc(100% - 40px);margin:auto;
+  box-shadow:var(--shadow);
+}
+.scrim.center{align-items:center}
+.confirm-box p{margin:0 0 20px;font-size:.98rem;line-height:1.75}
+.confirm-box .btns{display:flex;gap:8px}
+.confirm-box .btns .btn{flex:1}
+
+/* ---------- 確認ダイアログ（取り消せない操作は必ずここを通す） ---------- */
+.confirm-box h3{
+  margin:0 0 10px;font-size:1.08rem;font-weight:700;line-height:1.4;
+}
+.confirm-box .what{
+  list-style:none;margin:0 0 18px;padding:12px 14px;
+  background:var(--paper);border-radius:10px;
+  font-size:.9rem;line-height:1.9;
+}
+.confirm-box .what li{display:flex;justify-content:space-between;gap:14px}
+.confirm-box .what b{font-variant-numeric:tabular-nums}
+.confirm-box .warn{
+  margin:0 0 18px;font-size:.86rem;line-height:1.7;color:var(--danger);font-weight:700;
+}
+.confirm-box.tone-danger{border-top:4px solid var(--danger)}
+
+/* ---------- 危険な操作のまとまり ---------- */
+.card.danger-zone{border-color:var(--danger)}
+.card.danger-zone > h3{color:var(--danger)}
+.card .btn + .btn{margin-top:10px}
+
+/* ---------- 初期セットアップ案内（自前ホスティング版で設定が未入力のとき） ---------- */
+.setup{max-width:640px;margin:0 auto;padding:26px 16px 60px;text-align:left}
+.setup h2{
+  font-family:"Zen Old Mincho",serif;font-weight:600;letter-spacing:.05em;
+  font-size:1.25rem;margin:0 0 6px;
+}
+.setup p{font-size:.92rem;line-height:1.85;color:var(--ink-2);margin:0 0 14px}
+.setup ol{padding-left:1.3em;margin:0;font-size:.92rem;line-height:1.95}
+.setup li{margin-bottom:10px}
+.setup code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--surface-2);border-radius:4px;padding:1px 5px;font-size:.86em;
+}
+.setup pre{
+  background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+  padding:12px;overflow-x:auto;font-size:.8rem;line-height:1.6;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:0 0 14px;
+}

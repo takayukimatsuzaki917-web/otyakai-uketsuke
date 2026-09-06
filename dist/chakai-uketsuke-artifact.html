@@ -1,0 +1,1603 @@
+<title>茶会受付帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600&display=swap">
+
+<style>
+/* ===========================================================
+   デザイントークン
+   - 地色は「和紙」に寄せたごく淡い緑みのグレー
+   - 到着 = 青竹(緑) / 欠席 = 枯茶(黄土) と役割で色を分ける
+   - :root に全トークンを定義 → ダークは値だけ差し替える
+   =========================================================== */
+:root{
+  --paper:#f2f5f0;
+  --surface:#ffffff;
+  --surface-2:#e9ede7;
+  --ink:#1a201b;
+  --ink-2:#4c564e;
+  --ink-3:#7a847c;
+  --line:#d6ddd4;
+  --line-strong:#c2ccbf;
+  --accent:#2c6b47;
+  --on-accent:#ffffff;
+  --accent-text:#215137;
+  --accent-soft:#dceade;
+  --absent:#96682c;
+  --absent-text:#7d551f;
+  --absent-soft:#f0e6d3;
+  --danger:#a03b32;
+  --shadow:0 1px 2px rgba(26,32,27,.06), 0 8px 24px rgba(26,32,27,.07);
+  --sheet-shadow:0 -8px 40px rgba(26,32,27,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#131714;
+    --surface:#1b211c;
+    --surface-2:#242b25;
+    --ink:#e9efe9;
+    --ink-2:#aab5ab;
+    --ink-3:#7f8a81;
+    --line:#2e372f;
+    --line-strong:#3c463d;
+    --accent:#6dbf8d;
+    --on-accent:#0f1610;
+    --accent-text:#9ad8b4;
+    --accent-soft:#1d3629;
+    --absent:#d3a361;
+    --absent-text:#e0bb85;
+    --absent-soft:#372c1b;
+    --danger:#e08078;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --sheet-shadow:0 -8px 40px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131714;
+  --surface:#1b211c;
+  --surface-2:#242b25;
+  --ink:#e9efe9;
+  --ink-2:#aab5ab;
+  --ink-3:#7f8a81;
+  --line:#2e372f;
+  --line-strong:#3c463d;
+  --accent:#6dbf8d;
+  --on-accent:#0f1610;
+  --accent-text:#9ad8b4;
+  --accent-soft:#1d3629;
+  --absent:#d3a361;
+  --absent-text:#e0bb85;
+  --absent-soft:#372c1b;
+  --danger:#e08078;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --sheet-shadow:0 -8px 40px rgba(0,0,0,.55);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+
+.wrap{max-width:640px;margin:0 auto}
+
+/* ---------- ヘッダー（会名 + 全体の到着数） ---------- */
+.topbar{
+  position:sticky;top:0;z-index:30;
+  background:var(--surface);
+  border-bottom:1px solid var(--line);
+}
+.topbar-inner{
+  max-width:640px;margin:0 auto;
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;
+}
+.brand{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.brand h1{
+  margin:0;
+  font-family:"Zen Old Mincho",serif;
+  font-weight:600;font-size:1.06rem;letter-spacing:.06em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.brand .sub{
+  font-size:.7rem;letter-spacing:.14em;color:var(--ink-3);
+  text-transform:uppercase;
+}
+.total{
+  display:flex;align-items:baseline;gap:2px;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.total .n{font-size:1.5rem;font-weight:700;color:var(--accent-text);line-height:1}
+.total .d{font-size:.95rem;color:var(--ink-3)}
+.icon-btn{
+  flex:none;
+  width:44px;height:44px;
+  display:grid;place-items:center;
+  background:transparent;border:1px solid var(--line);border-radius:10px;
+  cursor:pointer;
+}
+.icon-btn:active{background:var(--surface-2)}
+.icon-btn svg{width:22px;height:22px;stroke:var(--ink-2);fill:none;stroke-width:1.7}
+
+/* ---------- 組タブ ---------- */
+.tabs{
+  position:sticky;top:65px;z-index:29;
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+}
+.tabs-scroll{
+  max-width:640px;margin:0 auto;
+  display:flex;gap:8px;
+  padding:9px 14px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.tabs-scroll::-webkit-scrollbar{display:none}
+.tab{
+  flex:none;
+  display:flex;align-items:baseline;gap:7px;
+  padding:9px 14px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:999px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.tab .g{font-weight:700;font-size:1rem}
+.tab .c{font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.tab[aria-selected="true"]{
+  background:var(--accent);border-color:var(--accent);
+  color:var(--on-accent);
+}
+.tab[aria-selected="true"] .c{color:inherit;opacity:.8}
+.tab.done{border-color:var(--accent);}
+
+/* ---------- 検索 / 絞り込み ---------- */
+.toolbar{
+  max-width:640px;margin:0 auto;
+  display:flex;gap:8px;align-items:center;
+  padding:10px 14px 6px;
+}
+.search{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;
+  padding:0 10px;
+  height:46px;
+}
+.search svg{width:18px;height:18px;stroke:var(--ink-3);fill:none;stroke-width:1.8;flex:none}
+.search input{
+  flex:1;min-width:0;height:100%;
+  background:transparent;border:0;outline:none;
+  font-size:1rem;
+}
+.search button{
+  flex:none;width:28px;height:28px;border:0;background:var(--surface-2);
+  border-radius:50%;cursor:pointer;color:var(--ink-2);line-height:1;
+}
+.filter{
+  flex:none;height:46px;padding:0 14px;
+  display:flex;align-items:center;gap:7px;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;cursor:pointer;font-size:.88rem;font-weight:500;
+  white-space:nowrap;
+}
+.filter[aria-pressed="true"]{
+  background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text);
+}
+.filter .box{
+  width:16px;height:16px;border:1.8px solid var(--line-strong);border-radius:4px;
+  display:grid;place-items:center;flex:none;
+}
+.filter[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent)}
+.filter[aria-pressed="true"] .box::after{content:"";width:8px;height:4px;border-left:2px solid var(--surface);border-bottom:2px solid var(--surface);transform:rotate(-45deg) translateY(-1px)}
+
+/* ---------- 組の内訳 ---------- */
+.breakdown{
+  max-width:640px;margin:0 auto;
+  padding:2px 16px 10px;
+  display:flex;flex-wrap:wrap;gap:4px 14px;
+  font-size:.8rem;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.breakdown b{font-weight:700;color:var(--ink)}
+.breakdown .sep{color:var(--line-strong)}
+
+/* ---------- 名簿リスト ---------- */
+.list{list-style:none;margin:0;padding:0 14px 120px;max-width:640px;margin:0 auto}
+.item{
+  display:flex;align-items:stretch;gap:0;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:12px;
+  margin-bottom:8px;
+  overflow:hidden;
+}
+.row{
+  flex:1;min-width:0;
+  display:flex;align-items:center;gap:13px;
+  padding:13px 4px 13px 13px;
+  min-height:70px;
+  background:transparent;border:0;text-align:left;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.row:active{background:var(--surface-2)}
+.mark{
+  flex:none;width:40px;height:40px;border-radius:50%;
+  display:grid;place-items:center;
+  border:2px solid var(--line-strong);
+  color:var(--ink-3);
+  font-size:1rem;font-weight:700;
+}
+.body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.nm{
+  font-size:1.24rem;font-weight:500;line-height:1.25;
+  word-break:break-word;
+}
+.note{
+  font-size:.8rem;color:var(--absent-text);
+  display:flex;gap:5px;align-items:flex-start;
+  line-height:1.35;
+}
+.note .tag{
+  flex:none;background:var(--absent-soft);color:var(--absent-text);
+  border-radius:4px;padding:1px 5px;font-size:.68rem;font-weight:700;letter-spacing:.06em;
+}
+.gtag{
+  font-size:.72rem;color:var(--ink-3);letter-spacing:.08em;font-weight:700;
+}
+.state{
+  flex:none;padding-right:6px;text-align:right;
+  display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+}
+.time{font-size:1.02rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent-text)}
+.state small{font-size:.7rem;color:var(--ink-3);letter-spacing:.06em}
+.more{
+  flex:none;width:46px;
+  background:transparent;border:0;border-left:1px solid var(--line);
+  cursor:pointer;color:var(--ink-3);font-size:1.15rem;letter-spacing:.1em;
+}
+.more:active{background:var(--surface-2)}
+
+/* 到着済み：面を淡い緑で塗り、丸印を塗りつぶす */
+.item.arrived{border-color:var(--accent);background:var(--accent-soft)}
+.item.arrived .mark{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.item.arrived .nm{font-weight:700}
+.item.arrived .more{border-left-color:var(--accent)}
+
+/* 欠席：彩度を落とし、名前に取り消し線 */
+.item.absent{background:var(--surface);border-style:dashed;border-color:var(--line-strong)}
+.item.absent .nm{color:var(--ink-3);text-decoration:line-through;text-decoration-thickness:1.5px;font-weight:400}
+.item.absent .mark{border-color:var(--absent);color:var(--absent-text);font-size:.85rem}
+
+/* ---------- 空状態 ---------- */
+.empty{
+  max-width:640px;margin:0 auto;
+  padding:34px 22px 60px;text-align:center;color:var(--ink-2);
+}
+.empty h2{
+  font-family:"Zen Old Mincho",serif;font-weight:600;
+  font-size:1.15rem;margin:0 0 8px;color:var(--ink);letter-spacing:.04em;
+}
+.empty p{margin:0 auto 18px;max-width:30em;font-size:.92rem;line-height:1.75}
+
+/* ---------- ボタン ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:50px;padding:0 20px;
+  border-radius:11px;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink);
+  font-size:1rem;font-weight:700;cursor:pointer;
+}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* ---------- ボトムシート / 全画面パネル ---------- */
+.scrim{
+  position:fixed;inset:0;z-index:60;
+  background:rgba(16,22,17,.5);
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.sheet{
+  width:100%;max-width:640px;
+  background:var(--surface);
+  border-radius:18px 18px 0 0;
+  box-shadow:var(--sheet-shadow);
+  padding:8px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height:88vh;overflow-y:auto;
+  animation:rise .18s ease-out;
+}
+@keyframes rise{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+.grabber{width:38px;height:4px;border-radius:2px;background:var(--line-strong);margin:6px auto 14px}
+.sheet h2{
+  margin:0 0 2px;font-size:1.3rem;font-weight:700;line-height:1.3;
+  word-break:break-word;
+}
+.sheet .who{font-size:.78rem;color:var(--ink-3);letter-spacing:.1em;margin-bottom:16px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.seg button{
+  min-height:62px;border-radius:11px;
+  border:1.5px solid var(--line);background:var(--surface);
+  cursor:pointer;font-size:.98rem;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+}
+.seg button small{font-size:.66rem;font-weight:500;color:var(--ink-3);letter-spacing:.04em}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-text)}
+.seg button[data-v="absent"][aria-pressed="true"]{background:var(--absent-soft);border-color:var(--absent);color:var(--absent-text)}
+.seg button[aria-pressed="true"] small{color:inherit;opacity:.75}
+
+label.fld{display:block;margin-bottom:16px}
+label.fld > span{
+  display:block;font-size:.78rem;font-weight:700;letter-spacing:.08em;
+  color:var(--ink-2);margin-bottom:6px;
+}
+.fld input[type="text"],.fld textarea,.fld select{
+  width:100%;padding:12px;
+  background:var(--paper);
+  border:1px solid var(--line-strong);border-radius:10px;
+  font-size:1rem;line-height:1.6;
+  outline:none;
+}
+.fld textarea{resize:vertical;min-height:76px}
+.fld .hint{font-size:.75rem;color:var(--ink-3);margin-top:5px;line-height:1.6}
+.sheet-actions{display:flex;gap:8px;margin-top:4px}
+.sheet-actions .btn{flex:1}
+
+/* ---------- 設定画面 ---------- */
+.panel{
+  position:fixed;inset:0;z-index:70;
+  background:var(--paper);
+  overflow-y:auto;
+}
+.panel-head{
+  position:sticky;top:0;z-index:5;
+  background:var(--surface);border-bottom:1px solid var(--line);
+}
+.panel-head .inner{
+  max-width:640px;margin:0 auto;
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+}
+.panel-head h2{
+  flex:1;margin:0;font-family:"Zen Old Mincho",serif;
+  font-size:1.05rem;font-weight:600;letter-spacing:.08em;
+}
+.panel-body{max-width:640px;margin:0 auto;padding:18px 14px calc(50px + env(safe-area-inset-bottom))}
+.card{
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;padding:16px;margin-bottom:14px;
+}
+.card > h3{
+  margin:0 0 4px;font-size:1rem;font-weight:700;letter-spacing:.03em;
+}
+.card > .lead{margin:0 0 14px;font-size:.82rem;color:var(--ink-2);line-height:1.7}
+.glist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.glist li{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;background:var(--paper);
+  border:1px solid var(--line);border-radius:10px;
+}
+.glist .gn{flex:1;min-width:0;font-weight:700;font-size:1.02rem;word-break:break-word}
+.glist .gc{font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.glist button{
+  flex:none;min-height:38px;padding:0 12px;border-radius:8px;
+  border:1px solid var(--line-strong);background:var(--surface);
+  font-size:.82rem;font-weight:700;cursor:pointer;
+}
+.row-add{display:flex;gap:8px;margin-top:12px}
+.row-add input{flex:1;min-width:0}
+.status{font-size:.82rem;color:var(--ink-2);margin-top:10px;line-height:1.6;min-height:1.4em}
+.status.err{color:var(--danger);font-weight:700}
+
+/* ---------- 通知バナー / トースト ---------- */
+.banner{
+  max-width:640px;margin:12px auto 0;
+  padding:12px 14px;border-radius:11px;
+  background:var(--absent-soft);color:var(--absent-text);
+  font-size:.85rem;line-height:1.65;
+  border:1px solid var(--absent);
+}
+.banner b{display:block;margin-bottom:3px;font-size:.9rem;color:var(--ink)}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  z-index:80;
+  display:flex;align-items:center;gap:14px;
+  background:var(--ink);color:var(--paper);
+  padding:12px 12px 12px 18px;border-radius:12px;
+  font-size:.92rem;font-weight:500;
+  box-shadow:var(--shadow);
+  max-width:calc(100% - 28px);
+  animation:rise .16s ease-out;
+}
+.toast button{
+  flex:none;background:transparent;border:1px solid rgba(255,255,255,.35);
+  color:inherit;border-radius:8px;padding:7px 12px;font-weight:700;font-size:.85rem;
+  cursor:pointer;
+}
+.toast .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.confirm-box{
+  background:var(--surface);border-radius:16px;padding:22px;
+  max-width:360px;width:calc(100% - 40px);margin:auto;
+  box-shadow:var(--shadow);
+}
+.scrim.center{align-items:center}
+.confirm-box p{margin:0 0 20px;font-size:.98rem;line-height:1.75}
+.confirm-box .btns{display:flex;gap:8px}
+.confirm-box .btns .btn{flex:1}
+
+/* ---------- 確認ダイアログ（取り消せない操作は必ずここを通す） ---------- */
+.confirm-box h3{
+  margin:0 0 10px;font-size:1.08rem;font-weight:700;line-height:1.4;
+}
+.confirm-box .what{
+  list-style:none;margin:0 0 18px;padding:12px 14px;
+  background:var(--paper);border-radius:10px;
+  font-size:.9rem;line-height:1.9;
+}
+.confirm-box .what li{display:flex;justify-content:space-between;gap:14px}
+.confirm-box .what b{font-variant-numeric:tabular-nums}
+.confirm-box .warn{
+  margin:0 0 18px;font-size:.86rem;line-height:1.7;color:var(--danger);font-weight:700;
+}
+.confirm-box.tone-danger{border-top:4px solid var(--danger)}
+
+/* ---------- 危険な操作のまとまり ---------- */
+.card.danger-zone{border-color:var(--danger)}
+.card.danger-zone > h3{color:var(--danger)}
+.card .btn + .btn{margin-top:10px}
+
+/* ---------- 初期セットアップ案内（自前ホスティング版で設定が未入力のとき） ---------- */
+.setup{max-width:640px;margin:0 auto;padding:26px 16px 60px;text-align:left}
+.setup h2{
+  font-family:"Zen Old Mincho",serif;font-weight:600;letter-spacing:.05em;
+  font-size:1.25rem;margin:0 0 6px;
+}
+.setup p{font-size:.92rem;line-height:1.85;color:var(--ink-2);margin:0 0 14px}
+.setup ol{padding-left:1.3em;margin:0;font-size:.92rem;line-height:1.95}
+.setup li{margin-bottom:10px}
+.setup code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--surface-2);border-radius:4px;padding:1px 5px;font-size:.86em;
+}
+.setup pre{
+  background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+  padding:12px;overflow-x:auto;font-size:.8rem;line-height:1.6;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:0 0 14px;
+}
+</style>
+
+<div id="app-root"></div>
+
+<script>
+/* =============================================================
+   茶会受付帳 － 保存先アダプタ（Claude Artifact の共有ストレージ）
+   -------------------------------------------------------------
+   Artifact 版で使います。claude.use("db") で得られる共有ストレージに、
+   参加者1人＝1ドキュメントで保存します。
+
+   データの置きかた:
+     meta/config        = {title: "…"}
+     groups/<組ID>      = {name, order, createdAt}
+     members/<人ID>     = {gid, name, order, status, arrivedAt, note, …}
+   ============================================================= */
+(function () {
+  "use strict";
+
+  var COL_GROUPS = "groups";
+  var COL_MEMBERS = "members";
+  var DOC_META = "meta/config";
+
+  var CONCURRENCY = 3;   // 同時に走らせる書き込み数（呼び出し回数の上限対策）
+  var RETRY = 3;         // 一時的な失敗をやり直す回数
+
+  var db = null;
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /** やり直して直る種類の失敗か */
+  function isRetryable(e) {
+    var c = e && e.code;
+    return c === "unavailable" || c === "resource_exhausted";
+  }
+
+  /** 1件の書き込みを、一時的な失敗なら間隔をあけてやり直しながら実行する */
+  async function runTask(task) {
+    for (var i = 0; i <= RETRY; i++) {
+      try { return await task(); }
+      catch (e) {
+        if (i === RETRY || !isRetryable(e)) throw e;
+        await sleep(300 * Math.pow(2, i) + Math.random() * 200);
+      }
+    }
+  }
+
+  /** 同時実行数を絞ってまとめて実行する */
+  async function runAll(tasks, onProgress) {
+    var done = 0, idx = 0, firstError = null;
+    async function worker() {
+      while (idx < tasks.length) {
+        var task = tasks[idx++];
+        try { await runTask(task); }
+        catch (e) { if (!firstError) firstError = e; }
+        done++;
+        if (onProgress) onProgress(done, tasks.length);
+      }
+    }
+    var workers = [];
+    for (var i = 0; i < Math.min(CONCURRENCY, tasks.length); i++) workers.push(worker());
+    await Promise.all(workers);
+    if (firstError) throw firstError;
+  }
+
+  /** 届いたドキュメントを id 付きの素のオブジェクトに直す */
+  function toObj(d) {
+    return Object.assign({ id: d.id }, d.data() || {});
+  }
+
+  /** 操作1件を、実行できる関数に変える */
+  function toTask(o) {
+    var kind = o.op.split(".")[0];
+    var verb = o.op.split(".")[1];
+    if (kind === "meta") return function () { return db.doc(DOC_META).set(o.data); };
+
+    var path = (kind === "member" ? COL_MEMBERS : COL_GROUPS) + "/" + o.id;
+    if (verb === "set")    return function () { return db.doc(path).set(o.data); };
+    if (verb === "update") return function () { return db.doc(path).update(o.data); };
+    return function () { return db.doc(path).delete(); };
+  }
+
+  window.ChakaiStore = {
+    label: "共有ストレージ",
+
+    connect: async function (h) {
+      var api = null;
+      try {
+        api = (window.claude && window.claude.use) ? await window.claude.use("db") : null;
+      } catch (e) { api = null; }
+      db = api;
+
+      if (!db) {
+        return { ok: false, error: "not_granted",
+          help: "<h2>共有データを開けません</h2><p>この受付帳は、共有ストレージが使える環境でのみ動きます。" +
+                "受付担当の方が同じ組織のアカウントでサインインしているか確かめてください。</p>" };
+      }
+
+      db.doc(DOC_META).onSnapshot(
+        function (s) { h.meta(s.exists ? s.data() : null); },
+        function () { /* 会の名称は無くても受付はできる */ });
+
+      db.collection(COL_GROUPS).onSnapshot(
+        function (s) { h.groups(s.docs.map(toObj)); },
+        function (e) { h.status(false, (e && e.code) || "unavailable"); });
+
+      db.collection(COL_MEMBERS).onSnapshot(
+        function (s) { h.members(s.docs.map(toObj)); },
+        function (e) { h.status(false, (e && e.code) || "unavailable"); });
+
+      return { ok: true };
+    },
+
+    commit: function (ops, onProgress) {
+      if (!db) return Promise.reject({ code: "not_granted" });
+      return runAll(ops.map(toTask), onProgress);
+    }
+  };
+})();
+</script>
+
+<script>
+/* =============================================================
+   茶会受付帳 － 画面ロジック（保存先に依存しない共通コア）
+   -------------------------------------------------------------
+   このファイルは「どこにデータを保存するか」を知りません。
+   保存は window.ChakaiStore（アダプタ）に任せます。
+
+   アダプタが備えるべきもの（src/store-firebase.js などを参照）:
+     connect(handlers) -> Promise<{ok:boolean, error?:string, help?:string}>
+         handlers = { meta(obj), groups(array), members(array), status(ok, code) }
+         購読を開始し、変化があるたびに handlers を呼ぶこと。
+     commit(ops, onProgress) -> Promise<void>
+         ops をまとめて書き込む。onProgress(done, total) で進捗を通知。
+     label : 保存先の呼び名（エラー文言に使う）
+
+   ops の書式（アダプタはこの語彙だけ理解すればよい）:
+     {op:"member.set",    id, data}   参加者を丸ごと作成／置き換え
+     {op:"member.update", id, data}   参加者の一部の項目だけ更新
+     {op:"member.delete", id}
+     {op:"group.set",     id, data}
+     {op:"group.update",  id, data}
+     {op:"group.delete",  id}
+     {op:"meta.set",      data}
+   ============================================================= */
+(function () {
+  "use strict";
+
+  /* =========================================================
+     定数
+     ========================================================= */
+  var WAITING = "waiting";   // 未到着
+  var ARRIVED = "arrived";   // 到着済み
+  var ABSENT  = "absent";    // 欠席
+  var STATUS_LABEL = { waiting: "未到着", arrived: "到着", absent: "欠席" };
+
+  var DEFAULT_TITLE = "茶会受付帳";
+  var TOAST_MS = 5000;          // トーストと「取消」を出しておく時間
+  var OVERRIDE_HOLD_MS = 1200;  // 書き込み後、ローカル値を優先し続ける時間
+
+  var Store = window.ChakaiStore;
+
+  /* =========================================================
+     状態
+     ========================================================= */
+  var connected = false;    // 保存先とつながっているか
+  var connError = null;     // つながらない理由（コード）
+  var connHelp = null;      // つながらないときに出す案内HTML（アダプタが用意）
+  var meta = { title: DEFAULT_TITLE };
+  var groups = [];          // {id, name, order}
+  var members = [];         // {id, gid, name, order, status, arrivedAt, note}
+  var activeGid = null;     // 表示中の組
+  var onlyWaiting = false;  // 「未着のみ」の絞り込み
+  var query = "";           // 氏名検索の入力
+  /* 楽観的更新の保持。書き込みが往復する間もローカルの値を優先し、画面のちらつきを防ぐ */
+  var overrides = new Map();
+  var toastTimer = null;
+  var settingsOpen = false;
+  var settingsGid = null;   // 一括登録の対象組
+
+  /* =========================================================
+     小さなユーティリティ
+     ========================================================= */
+  function $(id) { return document.getElementById(id); }
+
+  function uid(prefix) {
+    return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function nowIso() { return new Date().toISOString(); }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /** ISO文字列を「09:42」形式に。不正な値は空文字を返す */
+  function hhmm(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  function byOrder(a, b) {
+    if (a.order !== b.order) return a.order - b.order;
+    return String(a.name).localeCompare(String(b.name), "ja");
+  }
+
+  /** 検索用の正規化。姓名の間の空白や大文字小文字の違いを無視する */
+  function norm(s) { return String(s || "").replace(/[\s　]/g, "").toLowerCase(); }
+
+  function errText(e) {
+    if (!e) return "通信エラー";
+    return e.code || e.message || "通信エラー";
+  }
+
+  /* =========================================================
+     画面の骨組みを組み立てる
+     （自前ホスティング版・Artifact版で同じ画面を使うため、HTMLもここで持つ）
+     ========================================================= */
+  function renderShell() {
+    var root = $("app-root");
+    root.innerHTML =
+      '<div class="wrap">' +
+        '<header class="topbar"><div class="topbar-inner">' +
+          '<div class="brand"><h1 id="ttl">' + esc(DEFAULT_TITLE) + "</h1>" +
+            '<span class="sub">RECEPTION</span></div>' +
+          '<div class="total"><span class="n" id="tot-n">–</span><span class="d" id="tot-d"></span></div>' +
+          '<button class="icon-btn" id="btn-settings" aria-label="設定を開く">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle>' +
+            '<path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"></path></svg>' +
+          "</button>" +
+        "</div></header>" +
+
+        '<nav class="tabs" id="tabs-wrap" hidden><div class="tabs-scroll" id="tabs" role="tablist"></div></nav>' +
+        '<div id="conn"></div>' +
+
+        '<div class="toolbar" id="toolbar" hidden>' +
+          '<div class="search">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>' +
+            '<input id="q" type="search" inputmode="search" placeholder="氏名で全組から検索" aria-label="氏名で全組から検索">' +
+            '<button id="q-clear" hidden aria-label="検索を消す">×</button>' +
+          "</div>" +
+          '<button class="filter" id="only-waiting" aria-pressed="false">' +
+            '<span class="box" aria-hidden="true"></span>未着のみ</button>' +
+        "</div>" +
+
+        '<div class="breakdown" id="breakdown" hidden></div>' +
+        '<ul class="list" id="list"></ul>' +
+        '<div class="empty" id="empty" hidden></div>' +
+      "</div>";
+  }
+
+  /* =========================================================
+     保存先との接続
+     ========================================================= */
+  function mapGroup(v) {
+    return { id: String(v.id), name: String(v.name || ""), order: Number(v.order) || 0 };
+  }
+
+  function mapMember(v) {
+    return {
+      id: String(v.id),
+      gid: String(v.gid || ""),
+      name: String(v.name || ""),
+      order: Number(v.order) || 0,
+      status: (v.status === ARRIVED || v.status === ABSENT) ? v.status : WAITING,
+      arrivedAt: v.arrivedAt || null,
+      note: String(v.note || "")
+    };
+  }
+
+  function applyOverrides(list) {
+    if (overrides.size === 0) return list;
+    return list.map(function (m) {
+      var o = overrides.get(m.id);
+      return o ? Object.assign({}, m, o) : m;
+    });
+  }
+
+  async function connect() {
+    var res;
+    try {
+      res = await Store.connect({
+        meta: function (v) {
+          meta.title = (v && v.title) ? String(v.title) : DEFAULT_TITLE;
+          var el = $("ttl");
+          if (el) el.textContent = meta.title;
+          document.title = meta.title;
+        },
+        groups: function (list) {
+          groups = list.map(mapGroup).sort(byOrder);
+          if (!activeGid || !groups.some(function (g) { return g.id === activeGid; })) {
+            activeGid = groups.length ? groups[0].id : null;
+          }
+          renderAll();
+          if (settingsOpen) renderSettings();
+        },
+        members: function (list) {
+          members = applyOverrides(list.map(mapMember)).sort(byOrder);
+          renderAll();
+          if (settingsOpen) renderSettings();
+        },
+        /* 保存先との接続が切れた／戻ったときに呼ばれる */
+        status: function (ok, code) {
+          connected = !!ok;
+          connError = ok ? null : (code || "unavailable");
+          renderAll();
+        }
+      });
+    } catch (e) {
+      res = { ok: false, error: errText(e) };
+    }
+    connected = !!(res && res.ok);
+    if (!connected) {
+      connError = (res && res.error) || "unavailable";
+      connHelp = (res && res.help) || null;
+    }
+    renderAll();
+  }
+
+  /* =========================================================
+     書き込み
+     参加者は1人＝1レコード。別々の担当者が別々の人を同時に触っても、
+     互いの記録を打ち消しません。
+     ========================================================= */
+
+  /** 参加者1人の項目を更新する。画面には先に反映し、失敗したら戻す */
+  async function writeMember(id, patch) {
+    overrides.set(id, patch);
+    members = applyOverrides(members);
+    renderAll();
+    /* 保存先からの反映が届くまでのつなぎ。回線が細くても必ず期限で解除する */
+    var hold = setTimeout(function () { overrides.delete(id); }, OVERRIDE_HOLD_MS);
+    try {
+      await Store.commit([{ op: "member.update", id: id, data: patch }]);
+    } catch (e) {
+      clearTimeout(hold);
+      overrides.delete(id);
+      members = applyOverrides(members);
+      renderAll();
+      showToast("保存できませんでした（" + errText(e) + "）。電波を確かめて、もう一度タップしてください。");
+      throw e;
+    }
+  }
+
+  function statusPatch(status) {
+    return {
+      status: status,
+      arrivedAt: status === ARRIVED ? nowIso() : null,
+      updatedAt: nowIso()
+    };
+  }
+
+  /** 行タップ：未到着 ⇄ 到着 のトグル。欠席の行は誤操作を避けて詳細を開く */
+  function toggleArrival(m) {
+    if (!connected) { showToast("保存先につながっていないため記録できません。"); return; }
+    if (m.status === ABSENT) { openDetail(m.id); return; }
+    var next = m.status === ARRIVED ? WAITING : ARRIVED;
+    var before = { status: m.status, arrivedAt: m.arrivedAt, updatedAt: nowIso() };
+    /* 受付は速さが命なので、保存の往復を待たずに結果と「取消」を出す。
+       保存に失敗したときは writeMember がエラーのトーストで上書きする */
+    showToast(
+      m.name + " を「" + STATUS_LABEL[next] + "」にしました",
+      "取消",
+      function () { writeMember(m.id, before).catch(function () {}); }
+    );
+    writeMember(m.id, statusPatch(next)).catch(function () {});
+  }
+
+  /* =========================================================
+     集計
+     ========================================================= */
+  function tally(list) {
+    var t = { total: list.length, arrived: 0, waiting: 0, absent: 0 };
+    list.forEach(function (m) {
+      if (m.status === ARRIVED) t.arrived++;
+      else if (m.status === ABSENT) t.absent++;
+      else t.waiting++;
+    });
+    return t;
+  }
+
+  function membersOf(gid) {
+    return members.filter(function (m) { return m.gid === gid; });
+  }
+
+  /* =========================================================
+     描画
+     ========================================================= */
+  function renderAll() {
+    renderConn();
+    renderTotal();
+    renderTabs();
+    renderList();
+  }
+
+  function renderConn() {
+    var el = $("conn");
+    if (!el) return;
+    if (connected) { el.innerHTML = ""; return; }
+    if (connError === null) { el.innerHTML = ""; return; }  // 接続中はまだ何も出さない
+    var msg = connError === "revoked"
+      ? "この端末の共有アクセスが解除されました。ページを開き直してください。"
+      : "保存先に接続できませんでした（" + esc(connError) + "）。通信状況を確かめ、ページを再読み込みしてください。この間の操作は保存されません。";
+    el.innerHTML = '<div class="banner"><b>共有できていません</b>' + msg + "</div>";
+  }
+
+  function renderTotal() {
+    var t = tally(members);
+    $("tot-n").textContent = members.length ? t.arrived : "–";
+    $("tot-d").textContent = members.length ? "/" + t.total : "";
+  }
+
+  function renderTabs() {
+    var wrap = $("tabs-wrap"), box = $("tabs");
+    if (!groups.length) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+    box.innerHTML = groups.map(function (g) {
+      var t = tally(membersOf(g.id));
+      var done = t.total > 0 && t.arrived + t.absent === t.total;
+      return '<button class="tab' + (done ? " done" : "") + '" role="tab" data-gid="' + esc(g.id) + '"' +
+        ' aria-selected="' + (g.id === activeGid) + '">' +
+        '<span class="g">' + esc(g.name) + "</span>" +
+        '<span class="c">' + t.arrived + "/" + t.total + "</span></button>";
+    }).join("");
+  }
+
+  function renderList() {
+    var list = $("list"), empty = $("empty");
+    var toolbar = $("toolbar"), bd = $("breakdown");
+
+    /* --- 名簿がまだ無い／つながっていない場合の案内 --- */
+    if (!groups.length || !members.length) {
+      toolbar.hidden = true; bd.hidden = true; list.innerHTML = "";
+      empty.hidden = false;
+      if (!connected && connError) {
+        empty.innerHTML = connHelp ||
+          "<h2>読み込めません</h2><p>保存先に接続できないため、名簿を表示できません。</p>";
+      } else if (!connected) {
+        empty.innerHTML = "<h2>接続しています</h2><p>共有データを読み込んでいます。</p>";
+      } else if (!groups.length) {
+        empty.innerHTML = "<h2>まず組をつくります</h2><p>設定画面で組（A・B・C…）を追加し、それぞれの名簿を貼り付けてください。当日は設定を開く必要はありません。</p>" +
+          '<button class="btn primary" data-open-settings>設定をひらく</button>';
+      } else {
+        empty.innerHTML = "<h2>名簿がまだ空です</h2><p>設定画面で、組ごとに氏名を改行区切りで貼り付けると一括で登録できます。</p>" +
+          '<button class="btn primary" data-open-settings>名簿を登録する</button>';
+      }
+      return;
+    }
+
+    toolbar.hidden = false;
+    empty.hidden = true;
+
+    /* --- 表示対象：検索中は全組から、通常は選択中の組から --- */
+    var searching = query.length > 0;
+    var src = searching
+      ? members.filter(function (m) { return norm(m.name).indexOf(norm(query)) >= 0; })
+      : membersOf(activeGid);
+
+    if (searching) {
+      bd.hidden = false;
+      bd.innerHTML = "<span>「" + esc(query) + "」に一致 <b>" + src.length + "</b> 件（全組から検索）</span>";
+    } else {
+      var t = tally(src);
+      bd.hidden = false;
+      bd.innerHTML =
+        "<span>到着 <b>" + t.arrived + "</b></span>" +
+        '<span class="sep">|</span><span>未到着 <b>' + t.waiting + "</b></span>" +
+        (t.absent ? '<span class="sep">|</span><span>欠席 <b>' + t.absent + "</b></span>" : "") +
+        '<span class="sep">|</span><span>名簿 <b>' + t.total + "</b> 名</span>";
+    }
+
+    var shown = onlyWaiting ? src.filter(function (m) { return m.status === WAITING; }) : src;
+
+    if (!shown.length) {
+      list.innerHTML = "";
+      empty.hidden = false;
+      empty.innerHTML = searching
+        ? "<h2>見つかりません</h2><p>氏名の一部だけでも検索できます。姓と名の間の空白は無視されます。</p>"
+        : (onlyWaiting
+          ? "<h2>この組は受付が済みました</h2><p>未到着の方はいません。ほかの組に切り替えてください。</p>"
+          : "<h2>この組に名簿がありません</h2>");
+      return;
+    }
+    empty.hidden = true;
+
+    var gname = {};
+    groups.forEach(function (g) { gname[g.id] = g.name; });
+
+    list.innerHTML = shown.map(function (m) {
+      var cls = m.status === ARRIVED ? " arrived" : (m.status === ABSENT ? " absent" : "");
+      var mark = m.status === ARRIVED ? "✓" : (m.status === ABSENT ? "欠" : "");
+      var right = m.status === ARRIVED
+        ? '<span class="time">' + esc(hhmm(m.arrivedAt)) + "</span><small>到着</small>"
+        : (m.status === ABSENT ? "<small>欠席</small>" : "<small>未到着</small>");
+      var noteHtml = m.note ? '<span class="note"><span class="tag">備考</span>' + esc(m.note) + "</span>" : "";
+      var gtag = searching ? '<span class="gtag">' + esc(gname[m.gid] || "") + " 組</span>" : "";
+      return '<li class="item' + cls + '">' +
+          '<button class="row" data-act="toggle" data-id="' + esc(m.id) + '">' +
+            '<span class="mark" aria-hidden="true">' + mark + "</span>" +
+            '<span class="body">' + gtag + '<span class="nm">' + esc(m.name) + "</span>" + noteHtml + "</span>" +
+            '<span class="state">' + right + "</span>" +
+          "</button>" +
+          '<button class="more" data-act="detail" data-id="' + esc(m.id) + '" aria-label="' + esc(m.name) + ' の詳細">⋯</button>' +
+        "</li>";
+    }).join("");
+  }
+
+  /* =========================================================
+     トースト（取消つき）
+     ========================================================= */
+  function showToast(text, actionLabel, onAction) {
+    hideToast();
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.id = "toast";
+    el.setAttribute("role", "status");
+    var span = document.createElement("span");
+    span.className = "txt";
+    span.textContent = text;
+    el.appendChild(span);
+    if (actionLabel) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = actionLabel;
+      b.addEventListener("click", function () { hideToast(); onAction(); });
+      el.appendChild(b);
+    }
+    document.body.appendChild(el);
+    toastTimer = setTimeout(hideToast, TOAST_MS);
+  }
+
+  function hideToast() {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    var t = $("toast");
+    if (t) t.remove();
+  }
+
+  /* =========================================================
+     確認ダイアログ
+     取り消せない操作は必ずここを通す。何がいくつ消えるかを数字で見せる。
+     （iframe内では標準の confirm() が使えないため自前で用意）
+     @param {Object} o {title, body, what:[{k,v}], warn, ok, tone}
+     @returns {Promise<boolean>} 「実行する」を押したら true
+     ========================================================= */
+  function confirmDialog(o) {
+    if (typeof o === "string") o = { body: o };
+    return new Promise(function (resolve) {
+      var whatHtml = (o.what && o.what.length)
+        ? '<ul class="what">' + o.what.map(function (r) {
+            return "<li><span>" + esc(r.k) + "</span><b>" + esc(r.v) + "</b></li>";
+          }).join("") + "</ul>"
+        : "";
+      var scrim = document.createElement("div");
+      scrim.className = "scrim center";
+      scrim.innerHTML =
+        '<div class="confirm-box' + (o.tone === "danger" ? " tone-danger" : "") + '" role="dialog" aria-modal="true">' +
+          (o.title ? "<h3>" + esc(o.title) + "</h3>" : "") +
+          (o.body ? "<p>" + esc(o.body) + "</p>" : "") +
+          whatHtml +
+          (o.warn ? '<p class="warn">' + esc(o.warn) + "</p>" : "") +
+          '<div class="btns">' +
+            '<button class="btn ghost" data-no>やめる</button>' +
+            '<button class="btn danger" data-yes>' + esc(o.ok || "実行する") + "</button>" +
+          "</div>" +
+        "</div>";
+      function close(v) { scrim.remove(); resolve(v); }
+      scrim.addEventListener("click", function (e) {
+        if (e.target === scrim || e.target.closest("[data-no]")) close(false);
+        else if (e.target.closest("[data-yes]")) close(true);
+      });
+      document.body.appendChild(scrim);
+      var yes = scrim.querySelector("[data-yes]");
+      if (yes) yes.focus();
+    });
+  }
+
+  /* =========================================================
+     参加者の詳細シート（到着／未到着／欠席・備考・削除）
+     ========================================================= */
+  function openDetail(id) {
+    var m = members.find(function (x) { return x.id === id; });
+    if (!m) return;
+    var g = groups.find(function (x) { return x.id === m.gid; });
+
+    var scrim = document.createElement("div");
+    scrim.className = "scrim";
+    scrim.innerHTML =
+      '<div class="sheet" role="dialog" aria-modal="true" aria-label="' + esc(m.name) + ' の受付">' +
+        '<div class="grabber" aria-hidden="true"></div>' +
+        "<h2>" + esc(m.name) + "</h2>" +
+        '<div class="who">' + esc(g ? g.name + " 組" : "") +
+          (m.arrivedAt && m.status === ARRIVED ? "　到着 " + esc(hhmm(m.arrivedAt)) : "") + "</div>" +
+        '<div class="seg" role="group" aria-label="状態">' +
+          '<button type="button" data-v="waiting" aria-pressed="' + (m.status === WAITING) + '">未到着<small>これから</small></button>' +
+          '<button type="button" data-v="arrived" aria-pressed="' + (m.status === ARRIVED) + '">到着<small>時刻を記録</small></button>' +
+          '<button type="button" data-v="absent" aria-pressed="' + (m.status === ABSENT) + '">欠席<small>集計から除く</small></button>' +
+        "</div>" +
+        '<label class="fld"><span>備考</span>' +
+          '<textarea id="d-note" placeholder="お連れ様あり／お履物あずかり など">' + esc(m.note) + "</textarea>" +
+          '<span class="hint">入力すると名簿の行に表示されます。ほかの端末にもすぐ伝わります。</span>' +
+        "</label>" +
+        '<div class="sheet-actions">' +
+          '<button class="btn ghost" data-close>閉じる</button>' +
+          '<button class="btn primary" data-save>備考を保存</button>' +
+        "</div>" +
+        '<div style="margin-top:14px"><button class="btn danger wide" data-del>この方を名簿から削除</button></div>' +
+      "</div>";
+
+    function close() { scrim.remove(); }
+
+    scrim.addEventListener("click", async function (e) {
+      if (e.target === scrim || e.target.closest("[data-close]")) { close(); return; }
+
+      var seg = e.target.closest(".seg button");
+      if (seg) {
+        var v = seg.getAttribute("data-v");
+        scrim.querySelectorAll(".seg button").forEach(function (b) {
+          b.setAttribute("aria-pressed", String(b === seg));
+        });
+        writeMember(m.id, statusPatch(v)).catch(function () {});
+        return;
+      }
+
+      if (e.target.closest("[data-save]")) {
+        var note = scrim.querySelector("#d-note").value.trim();
+        close();
+        writeMember(m.id, { note: note, updatedAt: nowIso() })
+          .then(function () { showToast("備考を保存しました"); })
+          .catch(function () {});
+        return;
+      }
+
+      if (e.target.closest("[data-del]")) {
+        var ok = await confirmDialog({
+          title: "名簿から削除します",
+          body: m.name + " さんを名簿から消します。受付の記録も一緒に消えます。",
+          warn: "この操作は取り消せません。",
+          ok: "削除する", tone: "danger"
+        });
+        if (!ok) return;
+        close();
+        try {
+          await Store.commit([{ op: "member.delete", id: m.id }]);
+          showToast(m.name + " を削除しました");
+        } catch (err) { showToast("削除できませんでした（" + errText(err) + "）"); }
+      }
+    });
+
+    document.body.appendChild(scrim);
+  }
+
+  /* =========================================================
+     設定画面
+     ========================================================= */
+  function openSettings() {
+    settingsOpen = true;
+    if (!settingsGid || !groups.some(function (g) { return g.id === settingsGid; })) {
+      settingsGid = activeGid || (groups[0] && groups[0].id) || null;
+    }
+    var panel = document.createElement("div");
+    panel.className = "panel";
+    panel.id = "settings";
+    document.body.appendChild(panel);
+    renderSettings();
+    bindSettings(panel);
+  }
+
+  function closeSettings() {
+    settingsOpen = false;
+    var p = $("settings");
+    if (p) p.remove();
+  }
+
+  function renderSettings() {
+    var panel = $("settings");
+    if (!panel) return;
+    /* 他端末の更新で再描画されても、入力途中の内容は失わないよう退避する */
+    var keepTa = panel.querySelector("#bulk-text");
+    var keptText = keepTa ? keepTa.value : "";
+    var keptMode = panel.querySelector('input[name="bulk-mode"]:checked');
+    keptMode = keptMode ? keptMode.value : "append";
+
+    var gopts = groups.map(function (g) {
+      return '<option value="' + esc(g.id) + '"' + (g.id === settingsGid ? " selected" : "") + ">" +
+        esc(g.name) + " 組（" + membersOf(g.id).length + " 名）</option>";
+    }).join("");
+
+    var whole = tally(members);
+    var marked = members.filter(function (m) { return m.status !== WAITING || m.note; }).length;
+
+    var inputStyle = 'style="flex:1;min-width:0;padding:12px;background:var(--paper);' +
+      'border:1px solid var(--line-strong);border-radius:10px;font-size:1rem"';
+
+    panel.innerHTML =
+      '<div class="panel-head"><div class="inner">' +
+        '<button class="icon-btn" data-close-settings aria-label="設定を閉じる">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7"></path></svg></button>' +
+        "<h2>設定</h2>" +
+      "</div></div>" +
+      '<div class="panel-body">' +
+
+        /* --- 名簿の一括登録 --- */
+        '<div class="card">' +
+          "<h3>名簿の一括登録</h3>" +
+          '<p class="lead">氏名を <b>改行区切り</b> で貼り付けます。空行は無視されます。一度登録すれば、当日はこの画面を開く必要はありません。</p>' +
+          '<label class="fld"><span>登録する組</span><select id="bulk-gid">' +
+            (gopts || "<option>組がありません</option>") + "</select></label>" +
+          '<label class="fld"><span>氏名（改行区切り）</span>' +
+            '<textarea id="bulk-text" rows="8" placeholder="山田 太郎&#10;佐藤 花子&#10;鈴木 一郎">' + esc(keptText) + "</textarea></label>" +
+          '<div class="fld" style="margin-bottom:16px">' +
+            '<span style="display:block;font-size:.78rem;font-weight:700;letter-spacing:.08em;color:var(--ink-2);margin-bottom:6px">登録のしかた</span>' +
+            '<div style="display:flex;flex-direction:column;gap:8px">' +
+              '<label style="display:flex;gap:9px;align-items:flex-start;font-size:.9rem;line-height:1.6">' +
+                '<input type="radio" name="bulk-mode" value="append"' + (keptMode === "append" ? " checked" : "") + ' style="margin-top:4px">' +
+                "<span><b>追記する</b>（既にある名前はそのまま、新しい名前だけ足す）</span></label>" +
+              '<label style="display:flex;gap:9px;align-items:flex-start;font-size:.9rem;line-height:1.6">' +
+                '<input type="radio" name="bulk-mode" value="replace"' + (keptMode === "replace" ? " checked" : "") + ' style="margin-top:4px">' +
+                "<span><b>入れ替える</b>（貼り付けた名簿に合わせる。一覧に無い名前は受付記録ごと消えます）</span></label>" +
+            "</div></div>" +
+          '<button class="btn primary wide" id="bulk-run">この組に登録する</button>' +
+          '<div class="status" id="bulk-status"></div>' +
+        "</div>" +
+
+        /* --- 組の管理 --- */
+        '<div class="card">' +
+          "<h3>組の管理</h3>" +
+          '<p class="lead">組はいくつでも追加できます。名前は「A」「立礼席」など自由につけられます。</p>' +
+          '<ul class="glist">' + (groups.length ? groups.map(function (g) {
+            var t = tally(membersOf(g.id));
+            return "<li>" +
+              '<span class="gn">' + esc(g.name) + "</span>" +
+              '<span class="gc">' + t.arrived + "/" + t.total + " 名</span>" +
+              '<button data-ren="' + esc(g.id) + '">名称</button>' +
+              '<button data-delg="' + esc(g.id) + '">削除</button>' +
+            "</li>";
+          }).join("") : '<li><span class="gn" style="font-weight:400;color:var(--ink-3)">まだ組がありません</span></li>') + "</ul>" +
+          '<div class="row-add">' +
+            '<input id="new-group" type="text" placeholder="組の名前（例：H）" ' + inputStyle + ">" +
+            '<button class="btn" id="add-group">追加</button>' +
+          "</div>" +
+          '<div class="status" id="group-status"></div>' +
+        "</div>" +
+
+        /* --- 会の名称 --- */
+        '<div class="card">' +
+          "<h3>会の名称</h3>" +
+          '<p class="lead">受付画面の見出しに表示されます。</p>' +
+          '<div class="row-add" style="margin-top:0">' +
+            '<input id="meta-title" type="text" value="' + esc(meta.title) + '" ' + inputStyle + ">" +
+            '<button class="btn" id="save-title">保存</button>' +
+          "</div>" +
+        "</div>" +
+
+        /* --- リセット --- */
+        '<div class="card danger-zone">' +
+          "<h3>リセット</h3>" +
+          '<p class="lead">どちらも取り消せません。押すと必ず確認画面が出て、何がいくつ消えるかを確かめてから実行します。</p>' +
+          '<button class="btn danger wide" id="reset-records">受付の記録だけ消す（名簿は残る）</button>' +
+          '<button class="btn danger wide" id="reset-all">すべて消して最初から（名簿・組も消す）</button>' +
+          '<div class="status" id="reset-status">現在：名簿 ' + whole.total + " 名／組 " + groups.length +
+            "／記録のある方 " + marked + " 名</div>" +
+        "</div>" +
+
+      "</div>";
+  }
+
+  function bindSettings(panel) {
+    panel.addEventListener("change", function (e) {
+      if (e.target.id === "bulk-gid") settingsGid = e.target.value;
+    });
+
+    panel.addEventListener("click", async function (e) {
+      if (e.target.closest("[data-close-settings]")) { closeSettings(); return; }
+      if (e.target.closest("#bulk-run"))      { await doBulkRegister(panel); return; }
+      if (e.target.closest("#add-group"))     { await doAddGroup(panel); return; }
+      if (e.target.closest("#save-title"))    { await doSaveTitle(panel); return; }
+      if (e.target.closest("#reset-records")) { await doResetRecords(panel); return; }
+      if (e.target.closest("#reset-all"))     { await doResetAll(panel); return; }
+
+      var ren = e.target.closest("[data-ren]");
+      if (ren) {
+        var g = groups.find(function (x) { return x.id === ren.getAttribute("data-ren"); });
+        if (g) openRename(g);
+        return;
+      }
+
+      var dg = e.target.closest("[data-delg]");
+      if (dg) { await doDeleteGroup(panel, dg.getAttribute("data-delg")); return; }
+    });
+  }
+
+  /** 名簿の一括登録（追記／入れ替え） */
+  async function doBulkRegister(panel) {
+    var st = panel.querySelector("#bulk-status");
+    var btn = panel.querySelector("#bulk-run");
+    var gid = panel.querySelector("#bulk-gid").value;
+    var mode = panel.querySelector('input[name="bulk-mode"]:checked').value;
+    var names = panel.querySelector("#bulk-text").value
+      .split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+
+    if (!connected) { st.className = "status err"; st.textContent = "保存先に接続できていません。"; return; }
+    if (!gid) { st.className = "status err"; st.textContent = "先に組を追加してください。"; return; }
+    if (!names.length) {
+      st.className = "status err";
+      st.textContent = "氏名が読み取れませんでした。1行に1名ずつ貼り付けてください。";
+      return;
+    }
+
+    var existing = membersOf(gid);
+    var group = groups.find(function (g) { return g.id === gid; });
+    var ops = [], added = 0, removed = 0, kept = 0;
+
+    if (mode === "replace") {
+      var used = new Set();
+      names.forEach(function (nm, i) {
+        var hit = existing.find(function (m) { return !used.has(m.id) && m.name === nm; });
+        if (hit) {
+          used.add(hit.id); kept++;
+          if (hit.order !== i) ops.push({ op: "member.update", id: hit.id, data: { order: i } });
+        } else {
+          added++;
+          ops.push({ op: "member.set", id: uid("m_"), data: newMember(gid, nm, i) });
+        }
+      });
+      var doomed = existing.filter(function (m) { return !used.has(m.id); });
+      removed = doomed.length;
+      if (removed) {
+        var ok = await confirmDialog({
+          title: "名簿を入れ替えます",
+          body: (group ? group.name + " 組の" : "") + "貼り付けた名簿に合わせます。一覧に無い方は受付の記録ごと消えます。",
+          what: [
+            { k: "新しく追加", v: added + " 名" },
+            { k: "そのまま残る", v: kept + " 名" },
+            { k: "削除される", v: removed + " 名" }
+          ],
+          warn: "この操作は取り消せません。",
+          ok: "入れ替える", tone: "danger"
+        });
+        if (!ok) return;
+      }
+      doomed.forEach(function (m) { ops.push({ op: "member.delete", id: m.id }); });
+    } else {
+      var have = new Set(existing.map(function (m) { return m.name; }));
+      var base = existing.reduce(function (mx, m) { return Math.max(mx, m.order); }, -1) + 1;
+      names.forEach(function (nm) {
+        if (have.has(nm)) { kept++; return; }
+        have.add(nm);
+        ops.push({ op: "member.set", id: uid("m_"), data: newMember(gid, nm, base++) });
+        added++;
+      });
+    }
+
+    if (!ops.length) {
+      st.className = "status";
+      st.textContent = "変更はありませんでした（" + kept + " 名は登録済みです）。";
+      return;
+    }
+
+    btn.disabled = true;
+    st.className = "status";
+    st.textContent = "登録しています… 0 / " + ops.length;
+    try {
+      await Store.commit(ops, function (d, n) { st.textContent = "登録しています… " + d + " / " + n; });
+      st.textContent = "登録しました（追加 " + added + " 名" +
+        (kept ? "／そのまま " + kept + " 名" : "") + (removed ? "／削除 " + removed + " 名" : "") + "）。";
+      panel.querySelector("#bulk-text").value = "";
+    } catch (err) {
+      st.className = "status err";
+      st.textContent = "一部を登録できませんでした（" + errText(err) +
+        "）。もう一度「登録する」を押すと、足りない分だけ追加されます。";
+    }
+    btn.disabled = false;
+  }
+
+  function newMember(gid, name, order) {
+    return {
+      gid: gid, name: name, order: order,
+      status: WAITING, arrivedAt: null, note: "",
+      createdAt: nowIso(), updatedAt: nowIso()
+    };
+  }
+
+  /** 組を追加 */
+  async function doAddGroup(panel) {
+    var gs = panel.querySelector("#group-status");
+    var input = panel.querySelector("#new-group");
+    var name = input.value.trim();
+    if (!connected) { gs.className = "status err"; gs.textContent = "保存先に接続できていません。"; return; }
+    if (!name) { gs.className = "status err"; gs.textContent = "組の名前を入力してください。"; return; }
+    if (groups.some(function (g) { return g.name === name; })) {
+      gs.className = "status err"; gs.textContent = "同じ名前の組があります。"; return;
+    }
+    var order = groups.reduce(function (mx, g) { return Math.max(mx, g.order); }, -1) + 1;
+    try {
+      await Store.commit([{ op: "group.set", id: uid("g_"),
+        data: { name: name, order: order, createdAt: nowIso() } }]);
+      input.value = "";
+      gs.className = "status"; gs.textContent = name + " 組を追加しました。";
+    } catch (err) {
+      gs.className = "status err"; gs.textContent = "追加できませんでした（" + errText(err) + "）。";
+    }
+  }
+
+  /** 組を削除（所属する参加者ごと） */
+  async function doDeleteGroup(panel, gid) {
+    var g = groups.find(function (x) { return x.id === gid; });
+    if (!g) return;
+    var mem = membersOf(gid);
+    var t = tally(mem);
+    var ok = await confirmDialog({
+      title: g.name + " 組を削除します",
+      body: "この組と、所属する方の名簿・受付記録をまとめて消します。",
+      what: [
+        { k: "消える名簿", v: t.total + " 名" },
+        { k: "うち到着済み", v: t.arrived + " 名" }
+      ],
+      warn: "この操作は取り消せません。",
+      ok: "削除する", tone: "danger"
+    });
+    if (!ok) return;
+
+    var gs = panel.querySelector("#group-status");
+    gs.className = "status"; gs.textContent = "削除しています…";
+    var ops = mem.map(function (m) { return { op: "member.delete", id: m.id }; });
+    ops.push({ op: "group.delete", id: gid });
+    try {
+      await Store.commit(ops, function (d, n) { gs.textContent = "削除しています… " + d + " / " + n; });
+      gs.textContent = g.name + " 組を削除しました。";
+    } catch (err) {
+      gs.className = "status err";
+      gs.textContent = "削除しきれませんでした（" + errText(err) + "）。もう一度お試しください。";
+    }
+  }
+
+  /** 会の名称を保存 */
+  async function doSaveTitle(panel) {
+    var v = panel.querySelector("#meta-title").value.trim() || DEFAULT_TITLE;
+    try {
+      await Store.commit([{ op: "meta.set", data: { title: v, updatedAt: nowIso() } }]);
+      meta.title = v;
+      $("ttl").textContent = v;
+      document.title = v;
+      showToast("会の名称を保存しました");
+    } catch (err) { showToast("保存できませんでした（" + errText(err) + "）"); }
+  }
+
+  /** リセット其の一：受付の記録だけ消す（名簿は残す） */
+  async function doResetRecords(panel) {
+    var rs = panel.querySelector("#reset-status");
+    var marked = members.filter(function (m) { return m.status !== WAITING || m.note; });
+    if (!marked.length) {
+      rs.className = "status"; rs.textContent = "消す記録がありません。すでにすべて未到着です。"; return;
+    }
+    var t = tally(marked);
+    var noted = marked.filter(function (m) { return !!m.note; }).length;
+    var ok = await confirmDialog({
+      title: "受付の記録を消します",
+      body: "名簿と組はそのまま残り、到着・欠席・備考だけが消えて全員「未到着」に戻ります。",
+      what: [
+        { k: "到着を取り消す", v: t.arrived + " 名" },
+        { k: "欠席を取り消す", v: t.absent + " 名" },
+        { k: "備考を消す", v: noted + " 名" },
+        { k: "残る名簿", v: members.length + " 名" }
+      ],
+      warn: "この操作は取り消せません。",
+      ok: "記録を消す", tone: "danger"
+    });
+    if (!ok) return;
+
+    rs.className = "status"; rs.textContent = "消しています… 0 / " + marked.length;
+    var ops = marked.map(function (m) {
+      return { op: "member.update", id: m.id,
+        data: { status: WAITING, arrivedAt: null, note: "", updatedAt: nowIso() } };
+    });
+    try {
+      await Store.commit(ops, function (d, n) { rs.textContent = "消しています… " + d + " / " + n; });
+      rs.textContent = "受付の記録を消しました。名簿 " + members.length + " 名はそのまま残っています。";
+    } catch (err) {
+      rs.className = "status err";
+      rs.textContent = "一部が消せませんでした（" + errText(err) + "）。もう一度お試しください。";
+    }
+  }
+
+  /** リセット其の二：名簿・組も含めてすべて消す */
+  async function doResetAll(panel) {
+    var rs = panel.querySelector("#reset-status");
+    if (!members.length && !groups.length) {
+      rs.className = "status"; rs.textContent = "消すものがありません。"; return;
+    }
+    var t = tally(members);
+    var ok = await confirmDialog({
+      title: "すべて消して最初からやり直します",
+      body: "名簿・組・受付の記録を、この受付帳からすべて消します。空の状態に戻ります。",
+      what: [
+        { k: "消える組", v: groups.length + " 組" },
+        { k: "消える名簿", v: members.length + " 名" },
+        { k: "うち到着済み", v: t.arrived + " 名" }
+      ],
+      warn: "この操作は取り消せません。名簿の貼り直しが必要になります。",
+      ok: "すべて消す", tone: "danger"
+    });
+    if (!ok) return;
+
+    /* 取り返しがつかないので、二度目の確認を挟む */
+    var sure = await confirmDialog({
+      title: "本当によろしいですか",
+      body: "もう一度おたずねします。" + groups.length + " 組・" + members.length +
+        " 名の名簿がすべて消えます。受付の途中でないことを確かめてください。",
+      ok: "はい、すべて消します", tone: "danger"
+    });
+    if (!sure) { rs.className = "status"; rs.textContent = "取りやめました。何も消していません。"; return; }
+
+    var ops = members.map(function (m) { return { op: "member.delete", id: m.id }; })
+      .concat(groups.map(function (g) { return { op: "group.delete", id: g.id }; }));
+    rs.className = "status"; rs.textContent = "消しています… 0 / " + ops.length;
+    try {
+      await Store.commit(ops, function (d, n) { rs.textContent = "消しています… " + d + " / " + n; });
+      rs.textContent = "すべて消しました。組をつくって名簿を貼り付けてください。";
+    } catch (err) {
+      rs.className = "status err";
+      rs.textContent = "一部が消せませんでした（" + errText(err) + "）。もう一度お試しください。";
+    }
+  }
+
+  /** 組の名称変更シート */
+  function openRename(g) {
+    var scrim = document.createElement("div");
+    scrim.className = "scrim";
+    scrim.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' +
+      '<div class="grabber" aria-hidden="true"></div>' +
+      "<h2>組の名称</h2>" +
+      '<label class="fld"><span>名称</span><input id="rn" type="text" value="' + esc(g.name) + '"></label>' +
+      '<div class="sheet-actions"><button class="btn ghost" data-close>やめる</button>' +
+      '<button class="btn primary" data-ok>保存</button></div></div>';
+    scrim.addEventListener("click", async function (e) {
+      if (e.target === scrim || e.target.closest("[data-close]")) { scrim.remove(); return; }
+      if (e.target.closest("[data-ok]")) {
+        var v = scrim.querySelector("#rn").value.trim();
+        if (!v) return;
+        scrim.remove();
+        try { await Store.commit([{ op: "group.update", id: g.id, data: { name: v } }]); }
+        catch (err) { showToast("名称を保存できませんでした（" + errText(err) + "）"); }
+      }
+    });
+    document.body.appendChild(scrim);
+  }
+
+  /* =========================================================
+     イベント配線
+     ========================================================= */
+  function bindGlobal() {
+    document.addEventListener("click", function (e) {
+      var tab = e.target.closest(".tab[data-gid]");
+      if (tab) {
+        activeGid = tab.getAttribute("data-gid");
+        query = ""; $("q").value = ""; $("q-clear").hidden = true;
+        renderAll();
+        return;
+      }
+
+      var row = e.target.closest('[data-act="toggle"]');
+      if (row) {
+        var m = members.find(function (x) { return x.id === row.getAttribute("data-id"); });
+        if (m) toggleArrival(m);
+        return;
+      }
+
+      var more = e.target.closest('[data-act="detail"]');
+      if (more) { openDetail(more.getAttribute("data-id")); return; }
+
+      if (e.target.closest("#btn-settings") || e.target.closest("[data-open-settings]")) {
+        openSettings();
+      }
+    });
+
+    $("only-waiting").addEventListener("click", function () {
+      onlyWaiting = !onlyWaiting;
+      this.setAttribute("aria-pressed", String(onlyWaiting));
+      renderList();
+    });
+
+    $("q").addEventListener("input", function () {
+      query = this.value.trim();
+      $("q-clear").hidden = query.length === 0;
+      renderList();
+    });
+
+    $("q-clear").addEventListener("click", function () {
+      query = ""; $("q").value = ""; this.hidden = true; renderList();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      var s = document.querySelector(".scrim");
+      if (s) { s.remove(); return; }
+      if (settingsOpen) closeSettings();
+    });
+  }
+
+  /* =========================================================
+     起動
+     ========================================================= */
+  function boot() {
+    renderShell();
+    bindGlobal();
+    renderAll();
+    if (!Store) {
+      connError = "no-store";
+      connHelp = "<h2>保存先が設定されていません</h2><p>アダプタ（ChakaiStore）が読み込まれていません。</p>";
+      renderAll();
+      return;
+    }
+    connect();
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>

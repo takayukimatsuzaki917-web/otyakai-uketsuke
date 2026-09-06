@@ -1,0 +1,41 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "chakai": {
+      "$room": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+
+        "meta": {
+          "title":     { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "updatedAt": { ".validate": "newData.isString()" }
+        },
+
+        "groups": {
+          "$gid": {
+            ".validate": "newData.hasChild('name')",
+            "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "order":     { ".validate": "newData.isNumber()" },
+            "createdAt": { ".validate": "newData.isString()" }
+          }
+        },
+
+        "members": {
+          "$mid": {
+            ".validate": "newData.hasChildren(['gid', 'name'])",
+            "gid":       { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "name":      { ".validate": "newData.isString() && newData.val().length <= 60" },
+            "order":     { ".validate": "newData.isNumber()" },
+            "status":    { ".validate": "newData.isString() && newData.val().matches(/^(waiting|arrived|absent)$/)" },
+            "arrivedAt": { ".validate": "newData.isString()" },
+            "note":      { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "createdAt": { ".validate": "newData.isString()" },
+            "updatedAt": { ".validate": "newData.isString()" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>茶会受付帳</title>
+<meta name="description" content="お茶会当日、複数の受付担当が同じ名簿を見ながら到着・欠席・備考を記録する共有受付帳。">
+<meta name="theme-color" content="#f2f5f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131714" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="茶会受付">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍵</text></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600&display=swap">
+
+<link rel="stylesheet" href="src/app.css">
+<style>
+  /* Artifact 版では用意されている最小限のリセットを、ここでは自前で当てる */
+  html{color-scheme:light dark}
+  body{margin:0;font-size:14px}
+  img{max-width:100%}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+
+<div id="app-root"></div>
+
+<!-- Firebase（互換ビルド）。LINE のアプリ内ブラウザなど、少し古い環境でも動くようにしています -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+
+<!-- ご自身の Firebase の設定。ここだけ書き換えれば動きます -->
+<script src="config.js"></script>
+
+<!-- 保存先アダプタ → 画面ロジック の順に読み込む -->
+<script src="src/store-firebase.js"></script>
+<script src="src/app.js"></script>
+
+</body>
+</html>
